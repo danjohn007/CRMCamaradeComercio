@@ -12,7 +12,27 @@ $user = getCurrentUser();
     <title><?php echo APP_NAME; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php
+    // Cargar colores personalizados
+    try {
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario')");
+        $custom_colors = [];
+        while ($row = $stmt->fetch()) {
+            $custom_colors[$row['clave']] = $row['valor'];
+        }
+        $color_primario = $custom_colors['color_primario'] ?? '#1E40AF';
+        $color_secundario = $custom_colors['color_secundario'] ?? '#10B981';
+    } catch (Exception $e) {
+        $color_primario = '#1E40AF';
+        $color_secundario = '#10B981';
+    }
+    ?>
     <style>
+        :root {
+            --color-primario: <?php echo $color_primario; ?>;
+            --color-secundario: <?php echo $color_secundario; ?>;
+        }
         .sidebar {
             transition: transform 0.3s ease-in-out;
         }
@@ -28,6 +48,22 @@ $user = getCurrentUser();
         .dropdown:hover .dropdown-menu,
         .dropdown-menu:hover {
             display: block;
+        }
+        /* Apply custom colors */
+        .bg-blue-600, .bg-blue-50 .bg-blue-600 {
+            background-color: var(--color-primario) !important;
+        }
+        .text-blue-600, .hover\:text-blue-600:hover {
+            color: var(--color-primario) !important;
+        }
+        .border-blue-500, .focus\:ring-blue-500:focus {
+            border-color: var(--color-primario) !important;
+        }
+        .bg-green-600 {
+            background-color: var(--color-secundario) !important;
+        }
+        .text-green-600 {
+            color: var(--color-secundario) !important;
         }
     </style>
 </head>
