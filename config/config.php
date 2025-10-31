@@ -9,8 +9,19 @@ function getBaseUrl() {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'];
     $script = $_SERVER['SCRIPT_NAME'];
-    $path = str_replace(basename($script), '', $script);
-    return $protocol . $host . $path;
+    
+    // Obtener el path del directorio raíz del proyecto
+    // Eliminar el nombre del archivo y cualquier subdirectorio hasta llegar a la raíz
+    $path = dirname($script);
+    
+    // Si estamos en un subdirectorio (como /catalogos/), subir un nivel
+    $documentRoot = $_SERVER['DOCUMENT_ROOT'];
+    $rootPath = dirname(__DIR__); // ROOT_PATH del proyecto
+    
+    // Calcular la ruta relativa desde document root
+    $relativePath = str_replace($documentRoot, '', $rootPath);
+    
+    return $protocol . $host . $relativePath;
 }
 
 // Definir constantes del sistema

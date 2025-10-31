@@ -27,6 +27,17 @@ $user = getCurrentUser();
         $color_primario = '#1E40AF';
         $color_secundario = '#10B981';
     }
+    
+    // Contar notificaciones no leídas
+    $notificaciones_count = 0;
+    try {
+        $stmt = $db->prepare("SELECT COUNT(*) as total FROM notificaciones WHERE usuario_id = ? AND leida = 0");
+        $stmt->execute([$user['id']]);
+        $result = $stmt->fetch();
+        $notificaciones_count = $result['total'] ?? 0;
+    } catch (Exception $e) {
+        $notificaciones_count = 0;
+    }
     ?>
     <style>
         :root {
@@ -36,17 +47,19 @@ $user = getCurrentUser();
         .sidebar {
             transition: transform 0.3s ease-in-out;
         }
-        @media (max-width: 768px) {
-            .sidebar.hidden {
+        @media (max-width: 1024px) {
+            .sidebar {
                 transform: translateX(-100%);
+            }
+            .sidebar:not(.hidden) {
+                transform: translateX(0);
             }
         }
         /* Dropdown menu fix */
         .dropdown-menu {
             display: none;
         }
-        .dropdown:hover .dropdown-menu,
-        .dropdown-menu:hover {
+        .dropdown-menu.show {
             display: block;
         }
         /* Apply custom colors */
@@ -111,12 +124,16 @@ $user = getCurrentUser();
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
                         </svg>
-                        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">3</span>
+                        <?php if ($notificaciones_count > 0): ?>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            <?php echo $notificaciones_count > 99 ? '99+' : $notificaciones_count; ?>
+                        </span>
+                        <?php endif; ?>
                     </a>
 
                     <!-- Usuario -->
                     <div class="relative dropdown">
-                        <button class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
+                        <button id="userMenuButton" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
                             <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-semibold">
                                 <?php echo strtoupper(substr($user['nombre'] ?: 'U', 0, 1)); ?>
                             </div>
@@ -125,7 +142,7 @@ $user = getCurrentUser();
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
-                        <div class="dropdown-menu absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
+                        <div id="userMenu" class="dropdown-menu absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
                             <a href="<?php echo BASE_URL; ?>/perfil.php" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                                 <i class="fas fa-user mr-2"></i>Mi Perfil
                             </a>
@@ -147,8 +164,11 @@ $user = getCurrentUser();
 
     <!-- Contenedor principal con sidebar -->
     <div class="flex pt-16">
+        <!-- Overlay para móvil -->
+        <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden"></div>
+        
         <!-- Sidebar -->
-        <aside id="sidebar" class="sidebar fixed lg:static w-64 h-screen bg-white shadow-lg overflow-y-auto z-40">
+        <aside id="sidebar" class="sidebar fixed lg:static w-64 h-screen bg-white shadow-lg overflow-y-auto z-40 hidden lg:block">
             <div class="p-4">
                 <div class="mb-6 p-4 bg-blue-50 rounded-lg">
                     <p class="text-sm text-gray-600">Rol del usuario</p>
@@ -230,4 +250,3 @@ $user = getCurrentUser();
 
         <!-- Contenido principal -->
         <main class="flex-1 min-h-screen lg:ml-0">
-            <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden"></div>

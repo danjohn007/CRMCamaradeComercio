@@ -89,8 +89,46 @@ if (isset($_GET['success'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión - <?php echo APP_NAME; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php
+    // Cargar colores personalizados
+    try {
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario')");
+        $custom_colors = [];
+        while ($row = $stmt->fetch()) {
+            $custom_colors[$row['clave']] = $row['valor'];
+        }
+        $color_primario = $custom_colors['color_primario'] ?? '#1E40AF';
+        $color_secundario = $custom_colors['color_secundario'] ?? '#10B981';
+    } catch (Exception $e) {
+        $color_primario = '#1E40AF';
+        $color_secundario = '#10B981';
+    }
+    ?>
+    <style>
+        :root {
+            --color-primario: <?php echo $color_primario; ?>;
+            --color-secundario: <?php echo $color_secundario; ?>;
+        }
+        .bg-blue-600, .bg-gradient-to-br {
+            background-color: var(--color-primario) !important;
+        }
+        .text-blue-600 {
+            color: var(--color-primario) !important;
+        }
+        .hover\:bg-blue-700:hover, .hover\:underline:hover {
+            background-color: var(--color-primario) !important;
+            filter: brightness(0.9);
+        }
+        .focus\:ring-blue-500:focus {
+            --tw-ring-color: var(--color-primario) !important;
+        }
+        body {
+            background: linear-gradient(135deg, <?php echo $color_primario; ?>15 0%, <?php echo $color_secundario; ?>15 100%);
+        }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-blue-100 min-h-screen flex items-center justify-center">
+<body class="min-h-screen flex items-center justify-center">
     <div class="container mx-auto px-4 py-8">
         <div class="max-w-md mx-auto">
             <!-- Logo y Título -->
