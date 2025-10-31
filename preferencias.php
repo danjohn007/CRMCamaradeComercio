@@ -16,14 +16,35 @@ $success = '';
 // Procesar actualización de preferencias
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        // Validar tema
+        $tema = sanitize($_POST['tema'] ?? 'light');
+        $temas_validos = ['light', 'dark', 'auto'];
+        if (!in_array($tema, $temas_validos)) {
+            $tema = 'light';
+        }
+        
+        // Validar zona horaria
+        $zona_horaria = sanitize($_POST['zona_horaria'] ?? 'America/Mexico_City');
+        $zonas_validas = ['America/Mexico_City', 'America/Tijuana', 'America/Cancun', 'America/Monterrey'];
+        if (!in_array($zona_horaria, $zonas_validas)) {
+            $zona_horaria = 'America/Mexico_City';
+        }
+        
+        // Validar items por página
+        $items_por_pagina = intval($_POST['items_por_pagina'] ?? 20);
+        $items_validos = [10, 20, 50, 100];
+        if (!in_array($items_por_pagina, $items_validos)) {
+            $items_por_pagina = 20;
+        }
+        
         $preferencias = [
             'notificaciones_email' => isset($_POST['notificaciones_email']) ? 1 : 0,
             'notificaciones_whatsapp' => isset($_POST['notificaciones_whatsapp']) ? 1 : 0,
             'notificaciones_sistema' => isset($_POST['notificaciones_sistema']) ? 1 : 0,
             'idioma' => sanitize($_POST['idioma'] ?? 'es'),
-            'zona_horaria' => sanitize($_POST['zona_horaria'] ?? 'America/Mexico_City'),
-            'items_por_pagina' => intval($_POST['items_por_pagina'] ?? 20),
-            'tema' => sanitize($_POST['tema'] ?? 'light'),
+            'zona_horaria' => $zona_horaria,
+            'items_por_pagina' => $items_por_pagina,
+            'tema' => $tema,
         ];
 
         // Actualizar preferencias del usuario

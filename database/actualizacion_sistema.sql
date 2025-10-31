@@ -24,7 +24,7 @@ WHERE estatus IS NULL OR estatus = '';
 ALTER TABLE auditoria 
 MODIFY COLUMN IF EXISTS descripcion TEXT,
 ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45),
-ADD COLUMN IF NOT EXISTS user_agent VARCHAR(255);
+ADD COLUMN IF NOT EXISTS user_agent TEXT COMMENT 'User agent string del navegador';
 
 -- 5. Crear índices para mejorar el rendimiento
 CREATE INDEX IF NOT EXISTS idx_empresas_activo ON empresas(activo);

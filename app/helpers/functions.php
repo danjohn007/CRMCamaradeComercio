@@ -271,7 +271,8 @@ function registrarAuditoria($conn, $usuario_id, $accion, $tabla = '', $registro_
             $stmt = $conn->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, descripcion, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
             $ip = $_SERVER['REMOTE_ADDR'] ?? '';
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-            $stmt->bind_param("issssss", $usuario_id, $accion, $tabla, $registro_id, $descripcion, $ip, $ua);
+            // i=integer, s=string - usuario_id(i), accion(s), tabla(s), registro_id(i), descripcion(s), ip(s), ua(s)
+            $stmt->bind_param("isisss", $usuario_id, $accion, $tabla, $registro_id, $descripcion, $ip, $ua);
             $stmt->execute();
             $stmt->close();
         }
