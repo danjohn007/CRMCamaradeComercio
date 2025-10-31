@@ -243,10 +243,10 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <p class="text-blue-800 text-sm mb-3">
                     Recibirás notificaciones sobre renovaciones próximas, nuevos eventos, requerimientos que coincidan con tu perfil y actualizaciones del sistema.
                 </p>
-                <button onclick="alert('Función de configuración de notificaciones en desarrollo')" 
-                        class="text-blue-600 hover:text-blue-700 font-semibold text-sm">
+                <a href="<?php echo BASE_URL; ?>/preferencias.php" 
+                   class="text-blue-600 hover:text-blue-700 font-semibold text-sm">
                     <i class="fas fa-cog mr-1"></i>Configurar Preferencias
-                </button>
+                </a>
             </div>
         </div>
     </div>

@@ -572,6 +572,181 @@ include __DIR__ . '/app/views/layouts/header.php';
         </form>
     </div>
 </div>
+
+<?php elseif ($action === 'view' && $id): ?>
+<!-- Vista de detalles de empresa -->
+<?php
+$stmt = $db->prepare("SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre, 
+        m.nombre as membresia_nombre, v.nombre as vendedor_nombre
+        FROM empresas e
+        LEFT JOIN sectores s ON e.sector_id = s.id
+        LEFT JOIN categorias c ON e.categoria_id = c.id
+        LEFT JOIN membresias m ON e.membresia_id = m.id
+        LEFT JOIN vendedores v ON e.vendedor_id = v.id
+        WHERE e.id = ?");
+$stmt->execute([$id]);
+$empresa = $stmt->fetch();
+
+if (!$empresa) {
+    redirect('/empresas.php?error=not_found');
+}
+?>
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-5xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Detalles de la Empresa</h1>
+            <div class="flex gap-2">
+                <a href="?action=edit&id=<?php echo $empresa['id']; ?>" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-edit mr-2"></i>Editar
+                </a>
+                <a href="?action=list" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                    <i class="fas fa-arrow-left mr-2"></i>Volver
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <!-- Header con información principal -->
+            <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
+                <h2 class="text-2xl font-bold mb-2"><?php echo e($empresa['razon_social']); ?></h2>
+                <p class="text-blue-100">RFC: <?php echo e($empresa['rfc']); ?></p>
+            </div>
+
+            <!-- Información en tabs -->
+            <div class="p-6">
+                <!-- Información General -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">
+                        <i class="fas fa-info-circle mr-2 text-blue-600"></i>Información General
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600">Email</p>
+                            <p class="font-semibold"><?php echo e($empresa['email'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Teléfono</p>
+                            <p class="font-semibold"><?php echo e($empresa['telefono'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">WhatsApp</p>
+                            <p class="font-semibold"><?php echo e($empresa['whatsapp'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Representante Legal</p>
+                            <p class="font-semibold"><?php echo e($empresa['representante'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Sector</p>
+                            <p class="font-semibold"><?php echo e($empresa['sector_nombre'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Categoría</p>
+                            <p class="font-semibold"><?php echo e($empresa['categoria_nombre'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Membresía</p>
+                            <p class="font-semibold"><?php echo e($empresa['membresia_nombre'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Estatus</p>
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold <?php echo $empresa['activo'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                                <?php echo $empresa['activo'] ? 'Activa' : 'Suspendida'; ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ubicación -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">
+                        <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>Ubicación
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <p class="text-sm text-gray-600">Dirección Comercial</p>
+                            <p class="font-semibold"><?php echo e($empresa['direccion_comercial'] ?: 'No especificada'); ?></p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <p class="text-sm text-gray-600">Dirección Fiscal</p>
+                            <p class="font-semibold"><?php echo e($empresa['direccion_fiscal'] ?: 'No especificada'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Colonia</p>
+                            <p class="font-semibold"><?php echo e($empresa['colonia'] ?: 'No especificada'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Ciudad</p>
+                            <p class="font-semibold"><?php echo e($empresa['ciudad'] ?: 'No especificada'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Código Postal</p>
+                            <p class="font-semibold"><?php echo e($empresa['codigo_postal'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Estado</p>
+                            <p class="font-semibold"><?php echo e($empresa['estado'] ?: 'No especificado'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información de Afiliación -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">
+                        <i class="fas fa-handshake mr-2 text-blue-600"></i>Información de Afiliación
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-600">Fecha de Renovación</p>
+                            <p class="font-semibold"><?php echo $empresa['fecha_renovacion'] ? formatDate($empresa['fecha_renovacion']) : 'No especificada'; ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Vendedor</p>
+                            <p class="font-semibold"><?php echo e($empresa['vendedor_nombre'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Tipo de Afiliación</p>
+                            <p class="font-semibold"><?php echo e($empresa['tipo_afiliacion'] ?: 'No especificado'); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">No. de Registro</p>
+                            <p class="font-semibold"><?php echo e($empresa['no_registro'] ?: 'No especificado'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Descripción y Servicios -->
+                <?php if ($empresa['descripcion'] || $empresa['servicios_productos'] || $empresa['sitio_web']): ?>
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">
+                        <i class="fas fa-file-alt mr-2 text-blue-600"></i>Información Adicional
+                    </h3>
+                    <?php if ($empresa['descripcion']): ?>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 mb-2">Descripción</p>
+                        <p class="text-gray-800"><?php echo nl2br(e($empresa['descripcion'])); ?></p>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($empresa['servicios_productos']): ?>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 mb-2">Servicios y Productos</p>
+                        <p class="text-gray-800"><?php echo nl2br(e($empresa['servicios_productos'])); ?></p>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($empresa['sitio_web']): ?>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 mb-2">Sitio Web</p>
+                        <a href="<?php echo e($empresa['sitio_web']); ?>" target="_blank" class="text-blue-600 hover:underline">
+                            <?php echo e($empresa['sitio_web']); ?>
+                        </a>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>
