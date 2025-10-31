@@ -21,6 +21,14 @@ $user = getCurrentUser();
                 transform: translateX(-100%);
             }
         }
+        /* Dropdown menu fix */
+        .dropdown-menu {
+            display: none;
+        }
+        .dropdown:hover .dropdown-menu,
+        .dropdown-menu:hover {
+            display: block;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -71,7 +79,7 @@ $user = getCurrentUser();
                     </a>
 
                     <!-- Usuario -->
-                    <div class="relative group">
+                    <div class="relative dropdown">
                         <button class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
                             <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-semibold">
                                 <?php echo strtoupper(substr($user['nombre'] ?: 'U', 0, 1)); ?>
@@ -81,7 +89,7 @@ $user = getCurrentUser();
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
-                        <div class="hidden group-hover:block absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2">
+                        <div class="dropdown-menu absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
                             <a href="<?php echo BASE_URL; ?>/perfil.php" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                                 <i class="fas fa-user mr-2"></i>Mi Perfil
                             </a>
@@ -151,22 +159,22 @@ $user = getCurrentUser();
                     <div class="pt-4 mt-4 border-t border-gray-200">
                         <p class="px-4 text-xs font-semibold text-gray-400 uppercase mb-2">Administración</p>
                         
-                        <a href="<?php echo BASE_URL; ?>/catalogos/membresias.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <a href="<?php echo BASE_URL; ?>/catalogos/membresias.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
                             <i class="fas fa-tags w-5"></i>
                             <span>Membresías</span>
                         </a>
                         
-                        <a href="<?php echo BASE_URL; ?>/catalogos/categorias.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <a href="<?php echo BASE_URL; ?>/catalogos/categorias.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
                             <i class="fas fa-list w-5"></i>
                             <span>Categorías</span>
                         </a>
 
-                        <a href="<?php echo BASE_URL; ?>/usuarios.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <a href="<?php echo BASE_URL; ?>/usuarios.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
                             <i class="fas fa-users w-5"></i>
                             <span>Usuarios</span>
                         </a>
 
-                        <a href="<?php echo BASE_URL; ?>/importar.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <a href="<?php echo BASE_URL; ?>/importar.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
                             <i class="fas fa-file-import w-5"></i>
                             <span>Importar Datos</span>
                         </a>
@@ -175,7 +183,7 @@ $user = getCurrentUser();
 
                     <!-- Configuración -->
                     <?php if (hasPermission('PRESIDENCIA')): ?>
-                    <a href="<?php echo BASE_URL; ?>/configuracion.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                    <a href="<?php echo BASE_URL; ?>/configuracion.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
                         <i class="fas fa-cog w-5"></i>
                         <span>Configuración</span>
                     </a>

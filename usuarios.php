@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Solo PRESIDENCIA y Dirección pueden gestionar usuarios
-if ($_SESSION['user_role'] !== 'PRESIDENCIA' && $_SESSION['user_role'] !== 'Dirección') {
+if ($_SESSION['user_rol'] !== 'PRESIDENCIA' && $_SESSION['user_rol'] !== 'DIRECCION') {
     header('Location: ' . BASE_URL . '/dashboard.php');
     exit();
 }
@@ -148,7 +148,7 @@ if (!empty($params)) {
 $stmt->execute();
 $usuarios = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-$roles_disponibles = ['PRESIDENCIA', 'Dirección', 'Consejeros', 'Afiladores', 'Capturistas', 'Entidad Comercial', 'Empresa Tractora'];
+$roles_disponibles = ['PRESIDENCIA', 'DIRECCION', 'CONSEJERO', 'AFILADOR', 'CAPTURISTA', 'ENTIDAD_COMERCIAL', 'EMPRESA_TRACTORA'];
 
 include 'app/views/layouts/header.php';
 ?>
