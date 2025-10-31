@@ -16,6 +16,41 @@ $success = '';
 // Procesar actualización de configuración
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        // Procesar logo si se subió
+        $logo_path = $config['logo_sistema'] ?? '';
+        if (isset($_FILES['logo_sistema']) && $_FILES['logo_sistema']['error'] === UPLOAD_ERR_OK) {
+            // Validar tamaño de archivo (máximo 2MB)
+            $max_size = 2 * 1024 * 1024; // 2MB en bytes
+            if ($_FILES['logo_sistema']['size'] > $max_size) {
+                throw new Exception('El archivo es demasiado grande. Tamaño máximo: 2MB');
+            }
+            
+            $upload_dir = UPLOAD_PATH . '/logo/';
+            if (!file_exists($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+            
+            $file_extension = strtolower(pathinfo($_FILES['logo_sistema']['name'], PATHINFO_EXTENSION));
+            $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+            
+            if (in_array($file_extension, $allowed_extensions)) {
+                // Generar nombre único usando timestamp y uniqid para evitar colisiones
+                $new_filename = 'logo_' . time() . '_' . uniqid() . '.' . $file_extension;
+                $upload_path = $upload_dir . $new_filename;
+                
+                if (move_uploaded_file($_FILES['logo_sistema']['tmp_name'], $upload_path)) {
+                    $logo_path = '/public/uploads/logo/' . $new_filename;
+                    
+                    // Eliminar logo anterior si existe
+                    if (!empty($config['logo_sistema']) && file_exists(ROOT_PATH . $config['logo_sistema'])) {
+                        unlink(ROOT_PATH . $config['logo_sistema']);
+                    }
+                }
+            } else {
+                throw new Exception('Formato de archivo no permitido. Use: JPG, PNG, GIF o SVG');
+            }
+        }
+        
         $configuraciones = [
             'nombre_sitio' => sanitize($_POST['nombre_sitio'] ?? ''),
             'email_sistema' => sanitize($_POST['email_sistema'] ?? ''),
@@ -28,6 +63,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'color_secundario' => sanitize($_POST['color_secundario'] ?? '#10B981'),
             'terminos_condiciones' => $_POST['terminos_condiciones'] ?? '',
             'politica_privacidad' => $_POST['politica_privacidad'] ?? '',
+            'logo_sistema' => $logo_path,
+            // SMTP Configuration
+            'smtp_host' => sanitize($_POST['smtp_host'] ?? ''),
+            'smtp_port' => sanitize($_POST['smtp_port'] ?? '587'),
+            'smtp_user' => sanitize($_POST['smtp_user'] ?? ''),
+            'smtp_pass' => sanitize($_POST['smtp_pass'] ?? ''),
+            'smtp_secure' => sanitize($_POST['smtp_secure'] ?? 'tls'),
+            'smtp_from_name' => sanitize($_POST['smtp_from_name'] ?? ''),
+            // Shelly Relay API
+            'shelly_api_enabled' => isset($_POST['shelly_api_enabled']) ? '1' : '0',
+            'shelly_api_url' => sanitize($_POST['shelly_api_url'] ?? ''),
+            'shelly_api_channel' => sanitize($_POST['shelly_api_channel'] ?? '0'),
         ];
 
         foreach ($configuraciones as $clave => $valor) {
@@ -77,7 +124,7 @@ include __DIR__ . '/app/views/layouts/header.php';
         </div>
     <?php endif; ?>
 
-    <form method="POST" class="space-y-6">
+    <form method="POST" enctype="multipart/form-data" class="space-y-6">
         <!-- Información General -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-6">Información General</h2>
@@ -122,6 +169,80 @@ include __DIR__ . '/app/views/layouts/header.php';
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                            placeholder="Lunes a Viernes 9:00 AM - 6:00 PM">
                 </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        <i class="fas fa-image mr-2"></i>Logotipo del Sistema
+                    </label>
+                    <?php if (!empty($config['logo_sistema'])): ?>
+                        <div class="mb-2">
+                            <img src="<?php echo BASE_URL . e($config['logo_sistema']); ?>" 
+                                 alt="Logo actual" 
+                                 class="max-h-20 border rounded p-2">
+                        </div>
+                    <?php endif; ?>
+                    <input type="file" name="logo_sistema" 
+                           accept="image/png,image/jpeg,image/jpg,image/gif,image/svg+xml"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <p class="text-sm text-gray-500 mt-1">Formatos: JPG, PNG, GIF, SVG (máx. 2MB)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuración SMTP -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-envelope mr-2"></i>Configuración de Correo SMTP
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Servidor SMTP</label>
+                    <input type="text" name="smtp_host" 
+                           value="<?php echo e($config['smtp_host'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="smtp.gmail.com">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Puerto SMTP</label>
+                    <input type="number" name="smtp_port" 
+                           value="<?php echo e($config['smtp_port'] ?? '587'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="587">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Usuario SMTP</label>
+                    <input type="text" name="smtp_user" 
+                           value="<?php echo e($config['smtp_user'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="usuario@gmail.com">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Contraseña SMTP</label>
+                    <input type="password" name="smtp_pass" 
+                           value="<?php echo e($config['smtp_pass'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="••••••••">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Seguridad</label>
+                    <select name="smtp_secure" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="tls" <?php echo ($config['smtp_secure'] ?? 'tls') === 'tls' ? 'selected' : ''; ?>>TLS</option>
+                        <option value="ssl" <?php echo ($config['smtp_secure'] ?? '') === 'ssl' ? 'selected' : ''; ?>>SSL</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Nombre del Remitente</label>
+                    <input type="text" name="smtp_from_name" 
+                           value="<?php echo e($config['smtp_from_name'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="CRM Cámara de Comercio">
+                </div>
             </div>
         </div>
 
@@ -159,34 +280,95 @@ include __DIR__ . '/app/views/layouts/header.php';
 
         <!-- Personalización de Diseño -->
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-6">Personalización de Diseño</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-palette mr-2"></i>Personalización de Diseño
+            </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Color Primario</label>
                     <div class="flex gap-2">
-                        <input type="color" name="color_primario" 
+                        <input type="color" name="color_primario" id="color_primario"
                                value="<?php echo e($config['color_primario'] ?? '#1E40AF'); ?>"
                                class="w-16 h-10 border rounded cursor-pointer">
-                        <input type="text" 
+                        <input type="text" id="color_primario_text"
                                value="<?php echo e($config['color_primario'] ?? '#1E40AF'); ?>"
                                class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
                                readonly>
                     </div>
+                    <p class="text-sm text-gray-500 mt-1">Color principal de botones y elementos</p>
                 </div>
 
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Color Secundario</label>
                     <div class="flex gap-2">
-                        <input type="color" name="color_secundario" 
+                        <input type="color" name="color_secundario" id="color_secundario"
                                value="<?php echo e($config['color_secundario'] ?? '#10B981'); ?>"
                                class="w-16 h-10 border rounded cursor-pointer">
-                        <input type="text" 
+                        <input type="text" id="color_secundario_text"
                                value="<?php echo e($config['color_secundario'] ?? '#10B981'); ?>"
                                class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
                                readonly>
                     </div>
+                    <p class="text-sm text-gray-500 mt-1">Color para elementos secundarios y acentos</p>
                 </div>
+            </div>
+
+            <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>Nota:</strong> Los colores personalizados se aplicarán mediante CSS en el sistema. 
+                    Guarda la configuración para ver los cambios.
+                </p>
+            </div>
+        </div>
+
+        <!-- Shelly Relay API Configuration -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-plug mr-2"></i>Shelly Relay API - Control de Acceso
+            </h2>
+            
+            <div class="mb-4">
+                <label class="flex items-center">
+                    <input type="checkbox" name="shelly_api_enabled" value="1"
+                           <?php echo ($config['shelly_api_enabled'] ?? '0') === '1' ? 'checked' : ''; ?>
+                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2">
+                    <span class="text-gray-700 font-semibold">Habilitar integración con Shelly Relay API</span>
+                </label>
+                <p class="text-sm text-gray-500 mt-1 ml-6">
+                    Permite controlar el acceso a eventos mediante dispositivos Shelly Relay
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">URL de la API de Shelly</label>
+                    <input type="url" name="shelly_api_url" 
+                           value="<?php echo e($config['shelly_api_url'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="http://192.168.1.100/relay">
+                    <p class="text-sm text-gray-500 mt-1">Ejemplo: http://192.168.1.100/relay</p>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Canal del Relay</label>
+                    <select name="shelly_api_channel" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="0" <?php echo ($config['shelly_api_channel'] ?? '0') === '0' ? 'selected' : ''; ?>>Canal 0</option>
+                        <option value="1" <?php echo ($config['shelly_api_channel'] ?? '') === '1' ? 'selected' : ''; ?>>Canal 1</option>
+                        <option value="2" <?php echo ($config['shelly_api_channel'] ?? '') === '2' ? 'selected' : ''; ?>>Canal 2</option>
+                        <option value="3" <?php echo ($config['shelly_api_channel'] ?? '') === '3' ? 'selected' : ''; ?>>Canal 3</option>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">Seleccione el canal del relay a controlar</p>
+                </div>
+            </div>
+
+            <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p class="text-sm text-yellow-800">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <strong>Importante:</strong> Asegúrese de que la URL del dispositivo Shelly sea accesible desde el servidor. 
+                    Esta función permite activar el relay para el acceso físico a eventos.
+                </p>
             </div>
         </div>
 
@@ -273,5 +455,16 @@ include __DIR__ . '/app/views/layouts/header.php';
         </div>
     </div>
 </div>
+
+<script>
+// Update color text fields when color picker changes
+document.getElementById('color_primario')?.addEventListener('input', function(e) {
+    document.getElementById('color_primario_text').value = e.target.value;
+});
+
+document.getElementById('color_secundario')?.addEventListener('input', function(e) {
+    document.getElementById('color_secundario_text').value = e.target.value;
+});
+</script>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>

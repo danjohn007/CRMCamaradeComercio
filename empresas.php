@@ -15,6 +15,23 @@ $id = $_GET['id'] ?? null;
 $error = '';
 $success = '';
 
+// Suspender empresa
+if ($action === 'suspend' && $id) {
+    try {
+        $stmt = $db->prepare("UPDATE empresas SET activo = 0 WHERE id = ?");
+        $stmt->execute([$id]);
+        
+        // Registrar en auditoría
+        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'SUSPEND_EMPRESA', 'empresas', ?)");
+        $stmt->execute([$user['id'], $id]);
+        
+        $success = 'Empresa suspendida exitosamente';
+        $action = 'list';
+    } catch (Exception $e) {
+        $error = 'Error al suspender la empresa: ' . $e->getMessage();
+    }
+}
+
 // Procesar formulario de nueva empresa o edición
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit'])) {
     $data = [
@@ -38,6 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'fecha_renovacion' => $_POST['fecha_renovacion'] ?? null,
         'es_nueva' => isset($_POST['es_nueva']) ? 1 : 0,
         'es_actualizacion' => isset($_POST['es_actualizacion']) ? 1 : 0,
+        'descripcion' => sanitize($_POST['descripcion'] ?? ''),
+        'servicios_productos' => sanitize($_POST['servicios_productos'] ?? ''),
+        'palabras_clave' => sanitize($_POST['palabras_clave'] ?? ''),
+        'sitio_web' => sanitize($_POST['sitio_web'] ?? ''),
     ];
 
     try {
@@ -52,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $sql = "INSERT INTO empresas (no_registro, no_mes, fecha_recibo, razon_social, rfc, email, telefono, whatsapp, 
                     representante, direccion_comercial, direccion_fiscal, colonia, ciudad, codigo_postal, estado, 
                     sector_id, categoria_id, membresia_id, vendedor_id, tipo_afiliacion, fecha_renovacion, 
-                    es_nueva, es_actualizacion) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    es_nueva, es_actualizacion, descripcion, servicios_productos, palabras_clave, sitio_web) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
             $stmt->execute([
@@ -62,7 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 $data['representante'], $data['direccion_comercial'], $data['direccion_fiscal'],
                 $data['colonia'], $data['ciudad'], $data['codigo_postal'], $data['estado'],
                 $data['sector_id'], $data['categoria_id'], $data['membresia_id'], $data['vendedor_id'],
-                $data['tipo_afiliacion'], $data['fecha_renovacion'], $data['es_nueva'], $data['es_actualizacion']
+                $data['tipo_afiliacion'], $data['fecha_renovacion'], $data['es_nueva'], $data['es_actualizacion'],
+                $data['descripcion'], $data['servicios_productos'], $data['palabras_clave'], $data['sitio_web']
             ]);
             
             $empresa_id = $db->lastInsertId();
@@ -78,7 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $sql = "UPDATE empresas SET razon_social = ?, rfc = ?, email = ?, telefono = ?, whatsapp = ?, 
                     representante = ?, direccion_comercial = ?, direccion_fiscal = ?, colonia = ?, ciudad = ?, 
                     codigo_postal = ?, estado = ?, sector_id = ?, categoria_id = ?, membresia_id = ?, 
-                    vendedor_id = ?, tipo_afiliacion = ?, fecha_renovacion = ?, es_nueva = ?, es_actualizacion = ? 
+                    vendedor_id = ?, tipo_afiliacion = ?, fecha_renovacion = ?, es_nueva = ?, es_actualizacion = ?,
+                    descripcion = ?, servicios_productos = ?, palabras_clave = ?, sitio_web = ?
                     WHERE id = ?";
             
             $stmt = $db->prepare($sql);
@@ -88,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 $data['colonia'], $data['ciudad'], $data['codigo_postal'], $data['estado'],
                 $data['sector_id'], $data['categoria_id'], $data['membresia_id'], $data['vendedor_id'],
                 $data['tipo_afiliacion'], $data['fecha_renovacion'], $data['es_nueva'], $data['es_actualizacion'],
+                $data['descripcion'], $data['servicios_productos'], $data['palabras_clave'], $data['sitio_web'],
                 $id
             ]);
             
@@ -265,12 +289,24 @@ include __DIR__ . '/app/views/layouts/header.php';
                         </span>
                     </td>
                     <td class="px-6 py-4 text-sm">
-                        <a href="?action=edit&id=<?php echo $empresa['id']; ?>" class="text-blue-600 hover:underline mr-3">
-                            <i class="fas fa-edit"></i> Editar
-                        </a>
-                        <a href="?action=view&id=<?php echo $empresa['id']; ?>" class="text-green-600 hover:underline">
-                            <i class="fas fa-eye"></i> Ver
-                        </a>
+                        <div class="flex items-center space-x-2">
+                            <a href="?action=view&id=<?php echo $empresa['id']; ?>" 
+                               class="text-green-600 hover:text-green-800" 
+                               title="Ver detalles">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="?action=edit&id=<?php echo $empresa['id']; ?>" 
+                               class="text-blue-600 hover:text-blue-800" 
+                               title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="?action=suspend&id=<?php echo $empresa['id']; ?>" 
+                               class="text-orange-600 hover:text-orange-800"
+                               title="Suspender empresa"
+                               onclick="return confirm('¿Está seguro de suspender esta empresa?')">
+                                <i class="fas fa-ban"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -472,6 +508,55 @@ include __DIR__ . '/app/views/layouts/header.php';
                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                         <span class="ml-2 text-gray-700">Actualización</span>
                     </label>
+                </div>
+
+                <!-- Sección de Información Adicional -->
+                <div class="md:col-span-2 mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-info-circle mr-2"></i>Información Adicional
+                    </h3>
+                </div>
+
+                <!-- Descripción -->
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">Descripción de la Empresa</label>
+                    <textarea name="descripcion" rows="3"
+                              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                              placeholder="Breve descripción de la empresa y sus actividades..."><?php echo e($empresa['descripcion'] ?? ''); ?></textarea>
+                </div>
+
+                <!-- Servicios y Productos -->
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        <i class="fas fa-box mr-2"></i>Servicios y Productos
+                    </label>
+                    <textarea name="servicios_productos" rows="4"
+                              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                              placeholder="Liste los servicios y productos que ofrece la empresa..."><?php echo e($empresa['servicios_productos'] ?? ''); ?></textarea>
+                    <p class="text-sm text-gray-500 mt-1">Separe cada servicio o producto con comas o saltos de línea</p>
+                </div>
+
+                <!-- Palabras Clave -->
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        <i class="fas fa-tags mr-2"></i>Palabras Clave
+                    </label>
+                    <input type="text" name="palabras_clave"
+                           value="<?php echo e($empresa['palabras_clave'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="comercio, servicios, tecnología, consultoría...">
+                    <p class="text-sm text-gray-500 mt-1">Separe las palabras clave con comas para facilitar las búsquedas</p>
+                </div>
+
+                <!-- Sitio Web -->
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        <i class="fas fa-globe mr-2"></i>Sitio Web
+                    </label>
+                    <input type="url" name="sitio_web"
+                           value="<?php echo e($empresa['sitio_web'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="https://www.ejemplo.com">
                 </div>
             </div>
 

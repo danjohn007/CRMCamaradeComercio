@@ -36,6 +36,20 @@
                 overlay.classList.add('hidden');
             });
         }
+
+        // Cerrar sidebar en móvil al hacer clic en cualquier enlace del menú
+        const sidebarLinks = sidebar?.querySelectorAll('a');
+        if (sidebarLinks) {
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    // Solo en dispositivos móviles (menos de 1024px)
+                    if (window.innerWidth < 1024) {
+                        sidebar.classList.add('hidden');
+                        overlay.classList.add('hidden');
+                    }
+                });
+            });
+        }
     </script>
 </body>
 </html>

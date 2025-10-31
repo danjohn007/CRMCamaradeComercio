@@ -10,8 +10,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Solo PRESIDENCIA, Dirección y Afiladores pueden importar
-$allowed_roles = ['PRESIDENCIA', 'Dirección', 'Afiladores'];
-if (!in_array($_SESSION['user_role'], $allowed_roles)) {
+$allowed_roles = ['PRESIDENCIA', 'DIRECCION', 'AFILADOR'];
+if (!in_array($_SESSION['user_rol'], $allowed_roles)) {
     header('Location: ' . BASE_URL . '/dashboard.php');
     exit();
 }
