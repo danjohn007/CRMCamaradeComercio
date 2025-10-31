@@ -4,6 +4,9 @@
 
 USE crm_camara_comercio;
 
+-- Recomendación: antes de ejecutar asegúrate de hacer backup:
+-- mysqldump -u root -p crm_camara_comercio > backup_before_migration.sql
+
 -- Agregar campos de configuración SMTP si no existen
 INSERT IGNORE INTO configuracion (clave, valor, descripcion) VALUES
 ('smtp_host', '', 'Servidor SMTP para envío de correos'),
@@ -33,14 +36,16 @@ CREATE PROCEDURE AddColumnIfNotExists(
     IN columnDefinition VARCHAR(512)
 )
 BEGIN
-    DECLARE columnExists INT;
-    
+    DECLARE columnExists INT DEFAULT 0;
+
+    -- Forzamos una colación estable (utf8_general_ci) en las comparaciones para evitar
+    -- errores por mezcla de collations entre variables/funciones y las columnas de information_schema.
     SELECT COUNT(*) INTO columnExists
     FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = tableName
-    AND COLUMN_NAME = columnName;
-    
+    WHERE TABLE_SCHEMA = (DATABASE()) COLLATE utf8_general_ci
+      AND TABLE_NAME = (tableName) COLLATE utf8_general_ci
+      AND COLUMN_NAME = (columnName) COLLATE utf8_general_ci;
+
     IF columnExists = 0 THEN
         SET @sql = CONCAT('ALTER TABLE `', tableName, '` ADD COLUMN `', columnName, '` ', columnDefinition);
         PREPARE stmt FROM @sql;
@@ -68,11 +73,38 @@ CALL AddColumnIfNotExists('empresas', 'instagram', 'VARCHAR(255)');
 -- Limpiar procedimiento temporal
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 
--- Crear índice para búsquedas en palabras clave si no existe
-CREATE INDEX IF NOT EXISTS idx_palabras_clave ON empresas(palabras_clave(100));
+-- Crear índice para búsquedas en palabras clave si no existe (versión compatible con múltiples MySQL)
+-- Revisa information_schema.STATISTICS y crea el índice dinámicamente si no existe
+SET @cnt := (
+    SELECT COUNT(*)
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'empresas'
+      AND INDEX_NAME = 'idx_palabras_clave'
+);
+SET @sql := IF(@cnt = 0,
+    'ALTER TABLE `empresas` ADD INDEX `idx_palabras_clave` (`palabras_clave`(100))',
+    'SELECT \"index idx_palabras_clave already exists\"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Crear índice para sitio web si no existe
-CREATE INDEX IF NOT EXISTS idx_sitio_web ON empresas(sitio_web);
+SET @cnt2 := (
+    SELECT COUNT(*)
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'empresas'
+      AND INDEX_NAME = 'idx_sitio_web'
+);
+SET @sql2 := IF(@cnt2 = 0,
+    'ALTER TABLE `empresas` ADD INDEX `idx_sitio_web` (`sitio_web`)',
+    'SELECT \"index idx_sitio_web already exists\"'
+);
+PREPARE stmt2 FROM @sql2;
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
 
 -- Actualizar valores por defecto de configuración de colores si no existen
 INSERT IGNORE INTO configuracion (clave, valor, descripcion) VALUES
