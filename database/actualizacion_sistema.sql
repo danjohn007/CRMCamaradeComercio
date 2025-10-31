@@ -1,18 +1,52 @@
--- Script de Actualización del Sistema CRM
+-- Script de Actualización del Sistema CRM (lista para importar en servidor compartido)
 -- Fecha: 2025-10-31
--- Descripción: Actualizaciones para mejorar funcionalidad del sistema
+-- Nota: En entornos compartidos muchas veces NO se dispone del privilegio SUPER ni EVENT.
+-- Por eso este archivo:
+--  - NO ejecuta SET GLOBAL event_scheduler = ON;
+--  - La sección de creación del EVENT está comentada para evitar errores de privilegios.
+-- Si tu hosting permite EVENT y tienes privilegios, descomenta la sección indicada al final.
 
 USE crm_camara_comercio;
 
--- 1. Agregar columna de preferencias a usuarios si no existe
-ALTER TABLE usuarios 
-ADD COLUMN IF NOT EXISTS preferencias TEXT COMMENT 'Configuraciones de usuario en formato JSON';
+-- ======================================================
+-- 1. Agregar columna 'preferencias' a usuarios si no existe
+-- ======================================================
+SET @cnt := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'usuarios'
+    AND COLUMN_NAME = 'preferencias'
+);
+SET @sql := IF(
+  @cnt = 0,
+  "ALTER TABLE usuarios ADD COLUMN preferencias TEXT COMMENT 'Configuraciones de usuario en formato JSON'",
+  "SELECT 'column preferencias already exists'"
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- 2. Agregar columna estatus a empresas para compatibilidad
-ALTER TABLE empresas 
-ADD COLUMN IF NOT EXISTS estatus VARCHAR(50) DEFAULT 'Activa' COMMENT 'Estado textual de la empresa';
+-- ======================================================
+-- 2. Agregar columna 'estatus' a empresas para compatibilidad (si no existe)
+-- ======================================================
+SET @cnt := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND COLUMN_NAME = 'estatus'
+);
+SET @sql := IF(
+  @cnt = 0,
+  "ALTER TABLE empresas ADD COLUMN estatus VARCHAR(50) DEFAULT 'Activa' COMMENT 'Estado textual de la empresa'",
+  "SELECT 'column estatus already exists'"
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
+-- ======================================================
 -- 3. Actualizar estatus basado en campo activo existente
+-- ======================================================
 UPDATE empresas SET estatus = CASE 
     WHEN activo = 1 THEN 'Activa'
     WHEN activo = 0 THEN 'Suspendida'
@@ -20,20 +54,125 @@ UPDATE empresas SET estatus = CASE
 END
 WHERE estatus IS NULL OR estatus = '';
 
+-- ======================================================
 -- 4. Asegurar que la tabla de auditoría tiene todos los campos necesarios
-ALTER TABLE auditoria 
-MODIFY COLUMN IF EXISTS descripcion TEXT,
-ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45),
-ADD COLUMN IF NOT EXISTS user_agent TEXT COMMENT 'User agent string del navegador';
+-- ======================================================
+SET @cnt := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'auditoria'
+    AND COLUMN_NAME = 'descripcion'
+);
+SET @sql := IF(
+  @cnt > 0,
+  "ALTER TABLE auditoria MODIFY COLUMN descripcion TEXT",
+  "ALTER TABLE auditoria ADD COLUMN descripcion TEXT"
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- 5. Crear índices para mejorar el rendimiento
-CREATE INDEX IF NOT EXISTS idx_empresas_activo ON empresas(activo);
-CREATE INDEX IF NOT EXISTS idx_empresas_sector ON empresas(sector_id);
-CREATE INDEX IF NOT EXISTS idx_empresas_membresia ON empresas(membresia_id);
-CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_leida ON notificaciones(usuario_id, leida);
-CREATE INDEX IF NOT EXISTS idx_notificaciones_fecha ON notificaciones(created_at);
+SET @cnt := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'auditoria'
+    AND COLUMN_NAME = 'ip_address'
+);
+SET @sql := IF(
+  @cnt = 0,
+  "ALTER TABLE auditoria ADD COLUMN ip_address VARCHAR(45)",
+  "SELECT 'column ip_address already exists'"
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
+SET @cnt := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'auditoria'
+    AND COLUMN_NAME = 'user_agent'
+);
+SET @sql := IF(
+  @cnt = 0,
+  "ALTER TABLE auditoria ADD COLUMN user_agent TEXT COMMENT 'User agent string del navegador'",
+  "SELECT 'column user_agent already exists'"
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ======================================================
+-- 5. Crear índices para mejorar el rendimiento (si no existen)
+-- ======================================================
+SET @idx_cnt := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND INDEX_NAME = 'idx_empresas_activo'
+);
+SET @sql := IF(
+  @idx_cnt = 0,
+  "CREATE INDEX idx_empresas_activo ON empresas(activo)",
+  "SELECT 'index idx_empresas_activo already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_cnt := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND INDEX_NAME = 'idx_empresas_sector'
+);
+SET @sql := IF(
+  @idx_cnt = 0,
+  "CREATE INDEX idx_empresas_sector ON empresas(sector_id)",
+  "SELECT 'index idx_empresas_sector already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_cnt := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND INDEX_NAME = 'idx_empresas_membresia'
+);
+SET @sql := IF(
+  @idx_cnt = 0,
+  "CREATE INDEX idx_empresas_membresia ON empresas(membresia_id)",
+  "SELECT 'index idx_empresas_membresia already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_cnt := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'notificaciones'
+    AND INDEX_NAME = 'idx_notificaciones_usuario_leida'
+);
+SET @sql := IF(
+  @idx_cnt = 0,
+  "CREATE INDEX idx_notificaciones_usuario_leida ON notificaciones(usuario_id, leida)",
+  "SELECT 'index idx_notificaciones_usuario_leida already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_cnt := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'notificaciones'
+    AND INDEX_NAME = 'idx_notificaciones_fecha'
+);
+SET @sql := IF(
+  @idx_cnt = 0,
+  "CREATE INDEX idx_notificaciones_fecha ON notificaciones(created_at)",
+  "SELECT 'index idx_notificaciones_fecha already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ======================================================
 -- 6. Asegurar que existe la tabla de notificaciones con estructura correcta
+-- ======================================================
 CREATE TABLE IF NOT EXISTS notificaciones (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -48,7 +187,9 @@ CREATE TABLE IF NOT EXISTS notificaciones (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ======================================================
 -- 7. Insertar configuraciones por defecto si no existen
+-- ======================================================
 INSERT IGNORE INTO configuracion (clave, valor, descripcion) VALUES
 ('color_primario', '#1E40AF', 'Color primario del sistema (hexadecimal)'),
 ('color_secundario', '#10B981', 'Color secundario del sistema (hexadecimal)'),
@@ -58,15 +199,64 @@ INSERT IGNORE INTO configuracion (clave, valor, descripcion) VALUES
 ('items_por_pagina', '20', 'Elementos por página por defecto'),
 ('tema_defecto', 'light', 'Tema de color por defecto');
 
+-- ======================================================
 -- 8. Actualizar tabla empresas para asegurar columnas de información adicional
-ALTER TABLE empresas 
-ADD COLUMN IF NOT EXISTS estatus VARCHAR(50) DEFAULT 'Activa',
-ADD COLUMN IF NOT EXISTS descripcion TEXT,
-ADD COLUMN IF NOT EXISTS servicios_productos TEXT,
-ADD COLUMN IF NOT EXISTS palabras_clave TEXT,
-ADD COLUMN IF NOT EXISTS sitio_web VARCHAR(255);
+-- ======================================================
+SET @cols := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND COLUMN_NAME = 'descripcion'
+);
+SET @sql := IF(
+  @cols = 0,
+  "ALTER TABLE empresas ADD COLUMN descripcion TEXT",
+  "SELECT 'column descripcion already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+SET @cols := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND COLUMN_NAME = 'servicios_productos'
+);
+SET @sql := IF(
+  @cols = 0,
+  "ALTER TABLE empresas ADD COLUMN servicios_productos TEXT",
+  "SELECT 'column servicios_productos already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @cols := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND COLUMN_NAME = 'palabras_clave'
+);
+SET @sql := IF(
+  @cols = 0,
+  "ALTER TABLE empresas ADD COLUMN palabras_clave TEXT",
+  "SELECT 'column palabras_clave already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @cols := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'empresas'
+    AND COLUMN_NAME = 'sitio_web'
+);
+SET @sql := IF(
+  @cols = 0,
+  "ALTER TABLE empresas ADD COLUMN sitio_web VARCHAR(255)",
+  "SELECT 'column sitio_web already exists'"
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ======================================================
 -- 9. Crear vista para reporte de empresas activas
+-- ======================================================
 CREATE OR REPLACE VIEW v_empresas_activas AS
 SELECT 
     e.id,
@@ -90,7 +280,9 @@ LEFT JOIN categorias c ON e.categoria_id = c.id
 LEFT JOIN membresias m ON e.membresia_id = m.id
 WHERE e.activo = 1;
 
+-- ======================================================
 -- 10. Crear vista para empresas próximas a vencer
+-- ======================================================
 CREATE OR REPLACE VIEW v_empresas_por_vencer AS
 SELECT 
     e.id,
@@ -109,7 +301,9 @@ WHERE e.activo = 1
   AND DATEDIFF(e.fecha_renovacion, CURDATE()) BETWEEN 0 AND 30
 ORDER BY dias_restantes ASC;
 
+-- ======================================================
 -- 11. Trigger para notificar renovaciones próximas
+-- ======================================================
 DELIMITER //
 
 DROP TRIGGER IF EXISTS notificar_renovacion_proxima//
@@ -142,7 +336,9 @@ END//
 
 DELIMITER ;
 
+-- ======================================================
 -- 12. Procedimiento almacenado para limpiar notificaciones antiguas
+-- ======================================================
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS limpiar_notificaciones_antiguas//
@@ -162,7 +358,9 @@ END//
 
 DELIMITER ;
 
+-- ======================================================
 -- 13. Función para obtener estadísticas de empresas por sector
+-- ======================================================
 DELIMITER //
 
 DROP FUNCTION IF EXISTS contar_empresas_sector//
@@ -184,8 +382,10 @@ END//
 
 DELIMITER ;
 
--- 14. Insertar datos de prueba para notificaciones si es necesario
--- (Solo para desarrollo, comentar en producción)
+-- ======================================================
+-- 14. (Opcional) Inserción de datos de prueba para notificaciones
+--     (comentada por defecto — solo para desarrollo)
+-- ======================================================
 /*
 INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje) 
 SELECT 
@@ -198,24 +398,35 @@ WHERE id NOT IN (SELECT DISTINCT usuario_id FROM notificaciones WHERE tipo = 'BI
 LIMIT 10;
 */
 
+-- ======================================================
 -- 15. Actualizar permisos y roles
+-- ======================================================
 UPDATE usuarios SET rol = 'PRESIDENCIA' WHERE rol = 'ADMIN' OR rol = 'ADMINISTRADOR';
 
--- 16. Asegurar integridad referencial
--- Eliminar empresas huérfanas sin sector, categoría o membresía válidos
+-- ======================================================
+-- 16. Asegurar integridad referencial (corregir referencias inválidas a NULL)
+-- ======================================================
 UPDATE empresas SET sector_id = NULL WHERE sector_id NOT IN (SELECT id FROM sectores);
 UPDATE empresas SET categoria_id = NULL WHERE categoria_id NOT IN (SELECT id FROM categorias);
 UPDATE empresas SET membresia_id = NULL WHERE membresia_id NOT IN (SELECT id FROM membresias);
 
+-- ======================================================
 -- 17. Optimizar tablas
+-- ======================================================
 OPTIMIZE TABLE empresas;
 OPTIMIZE TABLE usuarios;
 OPTIMIZE TABLE notificaciones;
 OPTIMIZE TABLE auditoria;
 
--- 18. Crear evento para limpiar notificaciones automáticamente (si está habilitado el event scheduler)
-SET GLOBAL event_scheduler = ON;
-
+-- ======================================================
+-- 18. Evento para limpiar notificaciones automáticamente
+--     (SECCIÓN COMENTADA: en servidores compartidos es común NO tener privilegio EVENT
+--      ni permitir SET GLOBAL; por eso lo dejamos comentado. Si tu proveedor lo permite,
+--      descomenta y ejecuta.)
+-- ======================================================
+/*
+-- Si tienes privilegios para EVENT y deseas activar el scheduler, el proveedor debe habilitarlo.
+-- SET GLOBAL event_scheduler = ON;    -- requiere privilegio SUPER/SYSTEM_VARIABLES_ADMIN (NO ejecutar en hosting compartido)
 DROP EVENT IF EXISTS limpiar_notificaciones_mensual;
 
 CREATE EVENT IF NOT EXISTS limpiar_notificaciones_mensual
@@ -223,21 +434,9 @@ ON SCHEDULE EVERY 1 MONTH
 STARTS CURRENT_TIMESTAMP
 DO
 CALL limpiar_notificaciones_antiguas();
+*/
 
--- ===================================
--- RESUMEN DE CAMBIOS APLICADOS
--- ===================================
--- 1. ✅ Columna de preferencias en usuarios
--- 2. ✅ Columna estatus en empresas
--- 3. ✅ Índices de rendimiento agregados
--- 4. ✅ Tabla de notificaciones verificada
--- 5. ✅ Configuraciones por defecto insertadas
--- 6. ✅ Vistas para reportes creadas
--- 7. ✅ Trigger para notificaciones de renovación
--- 8. ✅ Procedimiento de limpieza de notificaciones
--- 9. ✅ Función para contar empresas por sector
--- 10. ✅ Evento automático de limpieza mensual
--- 11. ✅ Optimización de tablas
--- 12. ✅ Actualización de roles y permisos
-
-SELECT 'Script de actualización ejecutado exitosamente' as mensaje;
+-- ======================================================
+-- Mensaje final
+-- ======================================================
+SELECT 'Script preparado para importación en servidor compartido. Revisa advertencias sobre eventos y privilegios.' AS mensaje;
