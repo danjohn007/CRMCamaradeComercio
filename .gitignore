@@ -1,0 +1,48 @@
+# Archivos de configuración local
+config/config.local.php
+
+# Archivos subidos por usuarios
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Cache y temporales
+*.log
+*.tmp
+/tmp/*
+/cache/*
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.buildpath
+
+# Dependencias (si se agregan en el futuro)
+/vendor/
+/node_modules/
+
+# Archivos de sesión PHP
+/sessions/*
+
+# Archivos de respaldo
+*.bak
+*.backup
+*.sql.gz
+
+# Archivos de entorno
+.env
+.env.local
+
+# Archivos de log
+error_log
+access_log
+php_errors.log
