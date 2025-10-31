@@ -19,6 +19,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Procesar logo si se subió
         $logo_path = $config['logo_sistema'] ?? '';
         if (isset($_FILES['logo_sistema']) && $_FILES['logo_sistema']['error'] === UPLOAD_ERR_OK) {
+            // Validar tamaño de archivo (máximo 2MB)
+            $max_size = 2 * 1024 * 1024; // 2MB en bytes
+            if ($_FILES['logo_sistema']['size'] > $max_size) {
+                throw new Exception('El archivo es demasiado grande. Tamaño máximo: 2MB');
+            }
+            
             $upload_dir = UPLOAD_PATH . '/logo/';
             if (!file_exists($upload_dir)) {
                 mkdir($upload_dir, 0755, true);
@@ -28,7 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
             
             if (in_array($file_extension, $allowed_extensions)) {
-                $new_filename = 'logo_' . time() . '.' . $file_extension;
+                // Generar nombre único usando timestamp y uniqid para evitar colisiones
+                $new_filename = 'logo_' . time() . '_' . uniqid() . '.' . $file_extension;
                 $upload_path = $upload_dir . $new_filename;
                 
                 if (move_uploaded_file($_FILES['logo_sistema']['tmp_name'], $upload_path)) {
@@ -39,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         unlink(ROOT_PATH . $config['logo_sistema']);
                     }
                 }
+            } else {
+                throw new Exception('Formato de archivo no permitido. Use: JPG, PNG, GIF o SVG');
             }
         }
         
