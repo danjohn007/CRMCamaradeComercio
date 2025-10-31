@@ -165,6 +165,11 @@ $user = getCurrentUser();
                             <i class="fas fa-users w-5"></i>
                             <span>Usuarios</span>
                         </a>
+
+                        <a href="<?php echo BASE_URL; ?>/importar.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                            <i class="fas fa-file-import w-5"></i>
+                            <span>Importar Datos</span>
+                        </a>
                     </div>
                     <?php endif; ?>
 
