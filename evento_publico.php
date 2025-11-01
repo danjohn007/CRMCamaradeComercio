@@ -314,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded-lg">
                     <div class="flex items-center">
                         <i class="fas fa-check-circle text-green-500 text-2xl mr-3"></i>
-                        <div class="text-green-700 font-semibold"><?php echo $success; /* Already escaped in processing */ ?></div>
+                        <div class="text-green-700 font-semibold"><?php echo $success; /* Contains safe HTML link */ ?></div>
                     </div>
                 </div>
             <?php endif; ?>

@@ -147,7 +147,7 @@ class EmailHelper {
                 
                 <div class='qr-code'>
                     <p><strong>Presenta este código QR en el evento:</strong></p>
-                    <img src='" . BASE_URL . $qrCodePath . "' alt='Código QR'>
+                    <img src='" . htmlspecialchars(BASE_URL . $qrCodePath, ENT_QUOTES, 'UTF-8') . "' alt='Código QR'>
                 </div>
             </div>
             

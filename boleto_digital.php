@@ -159,7 +159,7 @@ if (empty($codigo)) {
                 <!-- Footer -->
                 <div class="mt-8 pt-6 border-t-2 border-gray-200 text-center text-sm text-gray-600">
                     <p>Este boleto es personal e intransferible</p>
-                    <p class="mt-2">Para más información contacta: <?php echo getConfiguracion('email_sistema') ?? 'info@camaraqro.com'; ?></p>
+                    <p class="mt-2">Para más información contacta: <?php echo htmlspecialchars(getConfiguracion('email_sistema') ?? 'info@camaraqro.com'); ?></p>
                 </div>
             </div>
             

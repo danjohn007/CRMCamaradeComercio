@@ -66,7 +66,7 @@ $privacidad = $config['politica_privacidad'] ?? '';
                         <p>Podemos actualizar esta política de privacidad ocasionalmente. Le notificaremos sobre cambios significativos.</p>
                         
                         <h2>8. Contacto</h2>
-                        <p>Si tiene preguntas sobre nuestra política de privacidad, contáctenos a: <?php echo e($config['email_sistema'] ?? 'info@camaraqro.com'); ?></p>
+                        <p>Si tiene preguntas sobre nuestra política de privacidad, contáctenos a: <?php echo htmlspecialchars($config['email_sistema'] ?? 'info@camaraqro.com'); ?></p>
                     </div>
                 <?php endif; ?>
                 
