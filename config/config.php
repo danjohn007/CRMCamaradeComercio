@@ -32,6 +32,9 @@ define('APP_PATH', ROOT_PATH . '/app');
 define('PUBLIC_PATH', ROOT_PATH . '/public');
 define('UPLOAD_PATH', PUBLIC_PATH . '/uploads');
 
+// Configuración de uploads
+define('MAX_FILE_SIZE', 5242880); // 5MB en bytes
+
 // Configuración de la base de datos
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'agenciae_canaco');

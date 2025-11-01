@@ -191,6 +191,12 @@ $user = getCurrentUser();
                     </a>
                     <?php endif; ?>
 
+                    <!-- Calendario -->
+                    <a href="<?php echo BASE_URL; ?>/calendario.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <i class="fas fa-calendar-alt w-5"></i>
+                        <span>Calendario</span>
+                    </a>
+
                     <!-- Eventos -->
                     <a href="<?php echo BASE_URL; ?>/eventos.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
                         <i class="fas fa-calendar w-5"></i>
@@ -202,6 +208,19 @@ $user = getCurrentUser();
                         <i class="fas fa-file-alt w-5"></i>
                         <span>Requerimientos</span>
                     </a>
+
+                    <!-- Mi Membresía (solo para usuarios externos) -->
+                    <?php if (in_array($user['rol'], ['ENTIDAD_COMERCIAL', 'EMPRESA_TRACTORA'])): ?>
+                    <a href="<?php echo BASE_URL; ?>/mi_membresia.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <i class="fas fa-id-card w-5"></i>
+                        <span>Mi Membresía</span>
+                    </a>
+                    
+                    <a href="<?php echo BASE_URL; ?>/completar_perfil.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <i class="fas fa-user-edit w-5"></i>
+                        <span>Completar Perfil</span>
+                    </a>
+                    <?php endif; ?>
 
                     <!-- Reportes -->
                     <?php if (hasPermission('CONSEJERO')): ?>
