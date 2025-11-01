@@ -51,6 +51,15 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Verificar si la columna costo existe en la tabla eventos
+$costo_column_exists = false;
+try {
+    $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'costo'");
+    $costo_column_exists = $stmt->fetch() !== false;
+} catch (Exception $e) {
+    $costo_column_exists = false;
+}
+
 // Procesar formulario de nuevo evento o edición
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) && hasPermission('DIRECCION')) {
     $data = [
@@ -61,37 +70,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
         'ubicacion' => sanitize($_POST['ubicacion'] ?? ''),
         'tipo' => $_POST['tipo'] ?? 'PUBLICO',
         'cupo_maximo' => $_POST['cupo_maximo'] ? (int)$_POST['cupo_maximo'] : null,
+        'costo' => ($costo_column_exists && isset($_POST['costo'])) ? (float)$_POST['costo'] : 0,
         'requiere_inscripcion' => isset($_POST['requiere_inscripcion']) ? 1 : 0,
+        'imagen' => null
     ];
 
-    try {
-        if ($action === 'new') {
-            $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, requiere_inscripcion, creado_por) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute([
-                $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
-                $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['requiere_inscripcion'], $user['id']
-            ]);
-            
-            $success = 'Evento creado exitosamente';
-            $action = 'list';
+    // Procesar imagen si se subió
+    if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
+        $result = uploadFile($_FILES['imagen'], ['jpg', 'jpeg', 'png', 'gif'], 5242880); // 5MB
+        if ($result['success']) {
+            $data['imagen'] = $result['filename'];
         } else {
-            $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
-                    ubicacion = ?, tipo = ?, cupo_maximo = ?, requiere_inscripcion = ? WHERE id = ?";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute([
-                $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
-                $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['requiere_inscripcion'], $id
-            ]);
-            
-            $success = 'Evento actualizado exitosamente';
-            $action = 'list';
+            $error = $result['message'];
         }
-    } catch (Exception $e) {
-        $error = 'Error al guardar el evento: ' . $e->getMessage();
+    }
+
+    if (!$error) {
+        try {
+            if ($action === 'new') {
+                // Construir SQL dinámicamente basado en si existe la columna costo
+                if ($costo_column_exists) {
+                    $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, imagen, requiere_inscripcion, creado_por) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params = [
+                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], $data['imagen'],
+                        $data['requiere_inscripcion'], $user['id']
+                    ];
+                } else {
+                    $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, imagen, requiere_inscripcion, creado_por) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params = [
+                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['imagen'],
+                        $data['requiere_inscripcion'], $user['id']
+                    ];
+                }
+                
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+                
+                $success = 'Evento creado exitosamente';
+                $action = 'list';
+            } else {
+                // UPDATE para edición
+                if ($data['imagen']) {
+                    // Con nueva imagen
+                    if ($costo_column_exists) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], $data['imagen'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    } else {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['imagen'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    }
+                } else {
+                    // Sin nueva imagen
+                    if ($costo_column_exists) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    } else {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    }
+                }
+                
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+                
+                $success = 'Evento actualizado exitosamente';
+                $action = 'list';
+            }
+        } catch (Exception $e) {
+            $error = 'Error al guardar el evento: ' . $e->getMessage();
+        }
     }
 }
 
@@ -337,6 +408,45 @@ include __DIR__ . '/app/views/layouts/header.php';
                 </div>
                 <?php endif; ?>
 
+                <?php if (isset($evento['costo']) && $evento['costo'] > 0): ?>
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-3">Costo</h2>
+                    <div class="flex items-center text-gray-600">
+                        <i class="fas fa-dollar-sign mr-3 text-green-500"></i>
+                        <span class="font-semibold text-2xl">$<?php echo number_format($evento['costo'], 2); ?> MXN</span>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <!-- Enlace público de registro (solo para administradores) -->
+                <?php if (hasPermission('DIRECCION')): ?>
+                <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-link mr-2 text-blue-600"></i>
+                        Enlace Público de Registro
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-3">Comparte este enlace para que los invitados puedan registrarse sin iniciar sesión:</p>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" readonly
+                               value="<?php echo BASE_URL; ?>/evento_publico.php?evento=<?php echo $evento['id']; ?>"
+                               id="enlacePublico"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-white">
+                        <button onclick="copiarEnlace()" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                </div>
+                <script>
+                function copiarEnlace() {
+                    const input = document.getElementById('enlacePublico');
+                    input.select();
+                    document.execCommand('copy');
+                    alert('¡Enlace copiado al portapapeles!');
+                }
+                </script>
+                <?php endif; ?>
+
                 <?php if ($evento['cupo_maximo']): ?>
                 <div class="mb-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-3">Disponibilidad</h2>
@@ -400,7 +510,7 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
         <?php endif; ?>
 
-        <form method="POST" class="bg-white rounded-lg shadow-md p-8">
+        <form method="POST" enctype="multipart/form-data" class="bg-white rounded-lg shadow-md p-8">
             <div class="space-y-6">
                 <!-- Título -->
                 <div>
@@ -452,12 +562,36 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </select>
                 </div>
 
-                <!-- Cupo -->
+                <!-- Cupo y Costo -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Cupo Máximo (dejar vacío para ilimitado)</label>
+                        <input type="number" name="cupo_maximo" min="1"
+                               value="<?php echo e($evento['cupo_maximo'] ?? ''); ?>"
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Costo del Evento (MXN)</label>
+                        <input type="number" name="costo" min="0" step="0.01"
+                               value="<?php echo e($evento['costo'] ?? '0'); ?>"
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                               placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Imagen del evento -->
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Cupo Máximo (dejar vacío para ilimitado)</label>
-                    <input type="number" name="cupo_maximo" min="1"
-                           value="<?php echo e($evento['cupo_maximo'] ?? ''); ?>"
+                    <label class="block text-gray-700 font-semibold mb-2">Imagen del Evento</label>
+                    <?php if (!empty($evento['imagen'])): ?>
+                        <div class="mb-2">
+                            <img src="<?php echo BASE_URL . '/public/uploads/' . e($evento['imagen']); ?>" 
+                                 alt="Imagen actual" class="w-48 h-auto rounded border">
+                            <p class="text-sm text-gray-600 mt-1">Imagen actual</p>
+                        </div>
+                    <?php endif; ?>
+                    <input type="file" name="imagen" accept="image/*"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <p class="text-sm text-gray-500 mt-1">Formatos permitidos: JPG, PNG, GIF (máx. 5MB)</p>
                 </div>
 
                 <!-- Requiere inscripción -->

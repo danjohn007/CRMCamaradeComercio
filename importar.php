@@ -1,13 +1,11 @@
 <?php
-session_start();
-require_once 'config/database.php';
-require_once 'app/helpers/functions.php';
+/**
+ * Módulo de importación de datos desde Excel/CSV
+ */
+require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/config/database.php';
 
-// Verificar autenticación
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/login.php');
-    exit();
-}
+requireLogin();
 
 // Solo PRESIDENCIA, Dirección y Afiladores pueden importar
 $allowed_roles = ['PRESIDENCIA', 'DIRECCION', 'AFILADOR'];
@@ -16,7 +14,8 @@ if (!in_array($_SESSION['user_rol'], $allowed_roles)) {
     exit();
 }
 
-$conn = getDBConnection();
+$user = getCurrentUser();
+$db = Database::getInstance()->getConnection();
 $message = '';
 $error = '';
 $results = [];
@@ -91,10 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                     }
                     
                     // Verificar duplicados por RFC
-                    $stmt = $conn->prepare("SELECT id FROM empresas WHERE rfc = ?");
-                    $stmt->bind_param("s", $rfc);
-                    $stmt->execute();
-                    $existe = $stmt->get_result()->num_rows > 0;
+                    $stmt = $db->prepare("SELECT id FROM empresas WHERE rfc = ?");
+                    $stmt->execute([$rfc]);
+                    $existe = $stmt->fetch();
                     
                     if ($existe) {
                         $results[] = [
@@ -108,53 +106,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                     
                     // Obtener IDs de catálogos
                     $sector_id = null;
-                    $stmt = $conn->prepare("SELECT id FROM sectores WHERE nombre = ? LIMIT 1");
-                    $stmt->bind_param("s", $sector);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    if ($result->num_rows > 0) {
-                        $sector_id = $result->fetch_assoc()['id'];
+                    $stmt = $db->prepare("SELECT id FROM sectores WHERE nombre = ? LIMIT 1");
+                    $stmt->execute([$sector]);
+                    $result = $stmt->fetch();
+                    if ($result) {
+                        $sector_id = $result['id'];
                     }
                     
                     $categoria_id = null;
                     if (!empty($categoria)) {
-                        $stmt = $conn->prepare("SELECT id FROM categorias WHERE nombre = ? LIMIT 1");
-                        $stmt->bind_param("s", $categoria);
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-                        if ($result->num_rows > 0) {
-                            $categoria_id = $result->fetch_assoc()['id'];
+                        $stmt = $db->prepare("SELECT id FROM categorias WHERE nombre = ? LIMIT 1");
+                        $stmt->execute([$categoria]);
+                        $result = $stmt->fetch();
+                        if ($result) {
+                            $categoria_id = $result['id'];
                         }
                     }
                     
                     $membresia_id = null;
-                    $stmt = $conn->prepare("SELECT id FROM membresias WHERE nombre = ? LIMIT 1");
-                    $stmt->bind_param("s", $membresia);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    if ($result->num_rows > 0) {
-                        $membresia_id = $result->fetch_assoc()['id'];
+                    $stmt = $db->prepare("SELECT id FROM membresias WHERE nombre = ? LIMIT 1");
+                    $stmt->execute([$membresia]);
+                    $result = $stmt->fetch();
+                    if ($result) {
+                        $membresia_id = $result['id'];
                     }
                     
                     // Insertar empresa
-                    $stmt = $conn->prepare("
+                    $stmt = $db->prepare("
                         INSERT INTO empresas (
                             razon_social, rfc, email, telefono, representante,
                             direccion_comercial, direccion_fiscal, sector_id, categoria_id,
                             membresia_id, tipo_afiliacion, vendedor, fecha_renovacion,
-                            no_recibo, no_factura, engomado, estatus, fecha_registro
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Activa', NOW())
+                            no_recibo, no_factura, engomado, activo, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
                     ");
                     
-                    $stmt->bind_param(
-                        "sssssssiiisssss",
-                        $empresa, $rfc, $email, $telefono, $representante,
-                        $direccion_comercial, $direccion_fiscal, $sector_id, $categoria_id,
-                        $membresia_id, $tipo_afiliacion, $vendedor, $fecha_renovacion,
-                        $no_recibo, $no_factura, $engomado
-                    );
-                    
-                    if ($stmt->execute()) {
+                    try {
+                        $stmt->execute([
+                            $empresa, $rfc, $email, $telefono, $representante,
+                            $direccion_comercial, $direccion_fiscal, $sector_id, $categoria_id,
+                            $membresia_id, $tipo_afiliacion, $vendedor, $fecha_renovacion,
+                            $no_recibo, $no_factura, $engomado
+                        ]);
+                        
+                        $empresa_id = $db->lastInsertId();
+                        
                         $results[] = [
                             'empresa' => $empresa,
                             'status' => 'success',
@@ -163,13 +159,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                         $importados++;
                         
                         // Registrar auditoría
-                        registrarAuditoria($conn, $_SESSION['user_id'], 'IMPORT', 'empresas', $stmt->insert_id, 
-                            "Empresa importada: $empresa");
-                    } else {
+                        $stmt_audit = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, descripcion) VALUES (?, 'IMPORT', 'empresas', ?, ?)");
+                        $stmt_audit->execute([$user['id'], $empresa_id, "Empresa importada: $empresa"]);
+                    } catch (Exception $e) {
                         $results[] = [
                             'empresa' => $empresa,
                             'status' => 'error',
-                            'mensaje' => 'Error en la base de datos: ' . $conn->error
+                            'mensaje' => 'Error en la base de datos: ' . $e->getMessage()
                         ];
                         $errores++;
                     }
