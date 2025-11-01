@@ -59,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'horario_atencion' => sanitize($_POST['horario_atencion'] ?? ''),
             'paypal_account' => sanitize($_POST['paypal_account'] ?? ''),
             'dias_aviso_renovacion' => sanitize($_POST['dias_aviso_renovacion'] ?? '30,15,5'),
+            'max_boletos_por_registro' => intval($_POST['max_boletos_por_registro'] ?? 10),
             'color_primario' => sanitize($_POST['color_primario'] ?? '#1E40AF'),
             'color_secundario' => sanitize($_POST['color_secundario'] ?? '#10B981'),
             'terminos_condiciones' => $_POST['terminos_condiciones'] ?? '',
@@ -168,6 +169,15 @@ include __DIR__ . '/app/views/layouts/header.php';
                            value="<?php echo e($config['horario_atencion'] ?? ''); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                            placeholder="Lunes a Viernes 9:00 AM - 6:00 PM">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Máximo de Boletos por Registro</label>
+                    <input type="number" name="max_boletos_por_registro" min="1" max="100"
+                           value="<?php echo e($config['max_boletos_por_registro'] ?? '10'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="10">
+                    <p class="text-sm text-gray-500 mt-1">Número máximo de boletos que se pueden solicitar por registro en eventos</p>
                 </div>
 
                 <div class="md:col-span-2">

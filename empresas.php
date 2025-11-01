@@ -221,7 +221,7 @@ if ($action === 'list' || $action === 'suspendidas') {
 include __DIR__ . '/app/views/layouts/header.php';
 ?>
 
-<?php if ($action === 'list'): ?>
+<?php if ($action === 'list' || $action === 'suspendidas'): ?>
 <!-- Listado de empresas -->
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
