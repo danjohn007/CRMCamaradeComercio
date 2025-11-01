@@ -17,29 +17,30 @@
         </div>
     </footer>
 
-    <!-- Script para el sidebar móvil -->
+    <!-- Script para el sidebar móvil y dropdown de usuario -->
     <script>
+        // Sidebar móvil
         const sidebarToggle = document.getElementById('sidebarToggle');
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
 
-        if (sidebarToggle) {
+        if (sidebarToggle && sidebar && overlay) {
             sidebarToggle.addEventListener('click', () => {
                 sidebar.classList.toggle('hidden');
                 overlay.classList.toggle('hidden');
+                // Agregar clase para animación
+                if (!sidebar.classList.contains('hidden')) {
+                    sidebar.style.transform = 'translateX(0)';
+                }
             });
-        }
 
-        if (overlay) {
             overlay.addEventListener('click', () => {
                 sidebar.classList.add('hidden');
                 overlay.classList.add('hidden');
             });
-        }
 
-        // Cerrar sidebar en móvil al hacer clic en cualquier enlace del menú
-        const sidebarLinks = sidebar?.querySelectorAll('a');
-        if (sidebarLinks) {
+            // Cerrar sidebar en móvil al hacer clic en cualquier enlace del menú
+            const sidebarLinks = sidebar.querySelectorAll('a');
             sidebarLinks.forEach(link => {
                 link.addEventListener('click', () => {
                     // Solo en dispositivos móviles (menos de 1024px)
@@ -48,6 +49,24 @@
                         overlay.classList.add('hidden');
                     }
                 });
+            });
+        }
+
+        // Dropdown de usuario (click en lugar de hover)
+        const userMenuButton = document.getElementById('userMenuButton');
+        const userMenu = document.getElementById('userMenu');
+
+        if (userMenuButton && userMenu) {
+            userMenuButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userMenu.classList.toggle('show');
+            });
+
+            // Cerrar al hacer clic fuera
+            document.addEventListener('click', (e) => {
+                if (!userMenuButton.contains(e.target) && !userMenu.contains(e.target)) {
+                    userMenu.classList.remove('show');
+                }
             });
         }
     </script>
