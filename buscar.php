@@ -31,9 +31,9 @@ if (!empty($query) || !empty($sector) || !empty($categoria) || !empty($membresia
             $params = [];
             
             if (!empty($query)) {
-                $whereClauses[] = "(e.razon_social LIKE ? OR e.rfc LIKE ? OR e.email LIKE ? OR e.representante LIKE ? OR e.descripcion LIKE ? OR e.servicios_productos LIKE ? OR e.palabras_clave LIKE ?)";
+                $whereClauses[] = "(e.razon_social LIKE ? OR e.rfc LIKE ? OR e.email LIKE ? OR e.representante LIKE ? OR e.descripcion LIKE ? OR e.servicios_productos LIKE ? OR e.palabras_clave LIKE ? OR e.whatsapp LIKE ?)";
                 $searchTerm = "%$query%";
-                $params = array_merge($params, array_fill(0, 7, $searchTerm));
+                $params = array_merge($params, array_fill(0, 8, $searchTerm));
             }
             
             if (!empty($sector)) {
@@ -85,6 +85,38 @@ if (!empty($query) || !empty($sector) || !empty($categoria) || !empty($membresia
                     ],
                     'enlace' => 'empresas.php?action=view&id=' . $empresa['id']
                 ];
+            }
+            
+            // También buscar en inscripciones a eventos si se busca por WhatsApp o RFC
+            if (!empty($query) && (preg_match('/^[0-9]{10}$/', $query) || preg_match('/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/i', $query))) {
+                $sql = "SELECT DISTINCT ei.*, e.titulo as evento_titulo, e.fecha_inicio
+                        FROM eventos_inscripciones ei
+                        JOIN eventos e ON ei.evento_id = e.id
+                        WHERE (ei.whatsapp_invitado LIKE ? OR ei.rfc_invitado LIKE ?)
+                        ORDER BY ei.fecha_inscripcion DESC
+                        LIMIT 10";
+                
+                $searchTerm = "%$query%";
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$searchTerm, $searchTerm]);
+                $inscripciones = $stmt->fetchAll();
+                
+                foreach ($inscripciones as $inscripcion) {
+                    $resultados[] = [
+                        'tipo' => 'inscripcion_evento',
+                        'id' => $inscripcion['id'],
+                        'titulo' => $inscripcion['razon_social_invitado'] ?: $inscripcion['nombre_invitado'],
+                        'descripcion' => 'Inscripción al evento: ' . $inscripcion['evento_titulo'],
+                        'metadata' => [
+                            'Nombre' => $inscripcion['nombre_invitado'],
+                            'WhatsApp' => $inscripcion['whatsapp_invitado'],
+                            'RFC' => $inscripcion['rfc_invitado'],
+                            'Evento' => $inscripcion['evento_titulo'],
+                            'Fecha Evento' => date('d/m/Y', strtotime($inscripcion['fecha_inicio']))
+                        ],
+                        'enlace' => 'boleto_digital.php?codigo=' . $inscripcion['codigo_qr']
+                    ];
+                }
             }
         }
         

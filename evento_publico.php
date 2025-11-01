@@ -2,9 +2,12 @@
 /**
  * Página pública de registro a eventos
  * Permite registro sin autenticación usando WhatsApp o RFC
+ * Incluye captcha, términos y condiciones, y generación de boletos digitales con QR
  */
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/app/helpers/qrcode.php';
+require_once __DIR__ . '/app/helpers/email.php';
 
 $db = Database::getInstance()->getConnection();
 $evento_id = $_GET['evento'] ?? null;
@@ -12,6 +15,16 @@ $error = '';
 $success = '';
 $empresa_data = null;
 $search_performed = false;
+
+// Generar captcha
+if (!isset($_SESSION['captcha_evento_num1'])) {
+    $_SESSION['captcha_evento_num1'] = rand(1, 10);
+    $_SESSION['captcha_evento_num2'] = rand(1, 10);
+}
+
+// Obtener configuración
+$config = getConfiguracion();
+$max_boletos = intval($config['max_boletos_por_registro'] ?? 10);
 
 // Verificar que el evento existe y está activo
 if (!$evento_id) {
@@ -26,7 +39,7 @@ if (!$evento) {
     die('Evento no encontrado o inactivo');
 }
 
-// Buscar empresa por WhatsApp o RFC
+// Buscar empresa por WhatsApp o RFC (incluye búsqueda en inscripciones)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'buscar') {
     $search_performed = true;
     $whatsapp = sanitize($_POST['whatsapp'] ?? '');
@@ -36,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $where_conditions = [];
         $params = [];
         
+        // Buscar primero en empresas
         if (!empty($whatsapp)) {
             $where_conditions[] = "whatsapp = ?";
             $params[] = $whatsapp;
@@ -51,8 +65,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmt->execute($params);
         $empresa_data = $stmt->fetch();
         
+        // Si no se encuentra en empresas, buscar en inscripciones previas
         if (!$empresa_data) {
-            $error = 'No se encontró una empresa registrada con esos datos. Por favor registre sus datos manualmente.';
+            $where_inscripciones = [];
+            $params_inscripciones = [];
+            
+            if (!empty($whatsapp)) {
+                $where_inscripciones[] = "whatsapp_invitado = ?";
+                $params_inscripciones[] = $whatsapp;
+            }
+            
+            if (!empty($rfc)) {
+                $where_inscripciones[] = "rfc_invitado = ?";
+                $params_inscripciones[] = $rfc;
+            }
+            
+            $where_insc_sql = implode(' OR ', $where_inscripciones);
+            $stmt = $db->prepare("
+                SELECT nombre_invitado, email_invitado, whatsapp_invitado, rfc_invitado, razon_social_invitado
+                FROM eventos_inscripciones 
+                WHERE ($where_insc_sql)
+                ORDER BY fecha_inscripcion DESC 
+                LIMIT 1
+            ");
+            $stmt->execute($params_inscripciones);
+            $inscripcion_previa = $stmt->fetch();
+            
+            if ($inscripcion_previa) {
+                // Usar datos de inscripción previa
+                $empresa_data = [
+                    'representante' => $inscripcion_previa['nombre_invitado'],
+                    'email' => $inscripcion_previa['email_invitado'],
+                    'whatsapp' => $inscripcion_previa['whatsapp_invitado'],
+                    'rfc' => $inscripcion_previa['rfc_invitado'],
+                    'razon_social' => $inscripcion_previa['razon_social_invitado'],
+                    'id' => null // No es empresa afiliada
+                ];
+            }
+        }
+        
+        if (!$empresa_data) {
+            $error = 'No se encontró un registro previo con esos datos. Por favor complete el formulario manualmente.';
         }
     } else {
         $error = 'Debe ingresar al menos WhatsApp o RFC para buscar.';
@@ -62,17 +115,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Procesar registro
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'registrar') {
     try {
+        $razon_social = sanitize($_POST['razon_social'] ?? '');
         $nombre = sanitize($_POST['nombre']);
         $email = sanitize($_POST['email']);
-        $telefono = sanitize($_POST['telefono']);
         $whatsapp = sanitize($_POST['whatsapp_registro']);
-        $rfc = sanitize($_POST['rfc_registro']);
+        $rfc = sanitize($_POST['rfc_registro'] ?? '');
         $boletos = intval($_POST['boletos_solicitados'] ?? 1);
+        $es_invitado = isset($_POST['es_invitado']) ? 1 : 0;
         $empresa_id = !empty($_POST['empresa_id']) ? intval($_POST['empresa_id']) : null;
+        $captcha_respuesta = intval($_POST['captcha_respuesta'] ?? 0);
+        $terminos = isset($_POST['terminos']);
+        
+        // Validar captcha
+        if ($captcha_respuesta != ($_SESSION['captcha_evento_num1'] + $_SESSION['captcha_evento_num2'])) {
+            throw new Exception('La respuesta del captcha es incorrecta');
+        }
+        
+        // Validar términos y condiciones
+        if (!$terminos) {
+            throw new Exception('Debe aceptar los términos y condiciones');
+        }
         
         // Validar campos obligatorios
-        if (empty($nombre) || empty($email)) {
-            throw new Exception('Nombre y email son obligatorios');
+        if (empty($nombre) || empty($email) || empty($whatsapp)) {
+            throw new Exception('Nombre, email y WhatsApp son obligatorios');
+        }
+        
+        // Validar WhatsApp (10 dígitos)
+        if (strlen($whatsapp) != 10 || !is_numeric($whatsapp)) {
+            throw new Exception('El WhatsApp debe tener exactamente 10 dígitos');
+        }
+        
+        // Validar RFC si NO es invitado
+        if (!$es_invitado && empty($rfc)) {
+            throw new Exception('El RFC es obligatorio para no invitados');
+        }
+        
+        // Validar RFC si se proporciona
+        if (!empty($rfc) && !validarRFC($rfc)) {
+            throw new Exception('El RFC no tiene un formato válido');
+        }
+        
+        // Validar email
+        if (!validarEmail($email)) {
+            throw new Exception('El email no tiene un formato válido');
+        }
+        
+        // Validar número de boletos
+        if ($boletos < 1 || $boletos > $max_boletos) {
+            throw new Exception("El número de boletos debe estar entre 1 y {$max_boletos}");
         }
         
         // Verificar cupo disponible
@@ -87,24 +178,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             throw new Exception('Este email ya está registrado para este evento');
         }
         
+        // Generar código QR único
+        $codigo_qr = QRCodeGenerator::generateUniqueCode();
+        
         // Registrar inscripción
         $stmt = $db->prepare("
             INSERT INTO eventos_inscripciones 
-            (evento_id, usuario_id, empresa_id, nombre_invitado, email_invitado, telefono_invitado, 
-             whatsapp_invitado, rfc_invitado, boletos_solicitados, es_invitado, estado) 
-            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, 'CONFIRMADO')
+            (evento_id, usuario_id, empresa_id, nombre_invitado, razon_social_invitado, email_invitado, 
+             whatsapp_invitado, rfc_invitado, boletos_solicitados, es_invitado, codigo_qr, estado) 
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO')
         ");
         
         $stmt->execute([
-            $evento_id, $empresa_id, $nombre, $email, $telefono, 
-            $whatsapp, $rfc, $boletos
+            $evento_id, $empresa_id, $nombre, $razon_social, $email, 
+            $whatsapp, $rfc, $boletos, $es_invitado, $codigo_qr
         ]);
+        
+        $inscripcion_id = $db->lastInsertId();
         
         // Actualizar contador de inscritos
         $stmt = $db->prepare("UPDATE eventos SET inscritos = inscritos + ? WHERE id = ?");
         $stmt->execute([$boletos, $evento_id]);
         
-        $success = "Registro exitoso! Se han confirmado $boletos boleto(s) para el evento. Recibirá un correo de confirmación.";
+        // Obtener datos completos de la inscripción
+        $stmt = $db->prepare("SELECT * FROM eventos_inscripciones WHERE id = ?");
+        $stmt->execute([$inscripcion_id]);
+        $inscripcion = $stmt->fetch();
+        
+        // Generar y guardar imagen QR
+        $qrCodePath = QRCodeGenerator::saveQRImage(
+            BASE_URL . '/boleto_digital.php?codigo=' . $codigo_qr,
+            $codigo_qr
+        );
+        
+        // Enviar email de confirmación con boleto digital
+        try {
+            EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+            
+            // Actualizar que el boleto fue enviado
+            $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
+            $stmt->execute([$inscripcion_id]);
+        } catch (Exception $e) {
+            // Log error but don't fail registration
+            error_log("Error sending email: " . $e->getMessage());
+        }
+        
+        // Regenerar captcha
+        $_SESSION['captcha_evento_num1'] = rand(1, 10);
+        $_SESSION['captcha_evento_num2'] = rand(1, 10);
+        
+        $success = "¡Registro exitoso! Se han confirmado {$boletos} boleto(s) para el evento. Recibirá un correo de confirmación con su boleto digital.";
+        
+        // Agregar enlace para imprimir boleto
+        $success .= " <a href='" . BASE_URL . "/boleto_digital.php?codigo={$codigo_qr}' target='_blank' class='underline font-bold'>Imprimir Boleto Ahora</a>";
         
         // Limpiar formulario
         $empresa_data = null;
@@ -112,6 +238,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
     } catch (Exception $e) {
         $error = 'Error al registrar: ' . $e->getMessage();
+        // Regenerar captcha en caso de error
+        $_SESSION['captcha_evento_num1'] = rand(1, 10);
+        $_SESSION['captcha_evento_num2'] = rand(1, 10);
     }
 }
 
@@ -185,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded-lg">
                     <div class="flex items-center">
                         <i class="fas fa-check-circle text-green-500 text-2xl mr-3"></i>
-                        <p class="text-green-700 font-semibold"><?php echo e($success); ?></p>
+                        <div class="text-green-700 font-semibold"><?php echo $success; /* Already escaped in processing */ ?></div>
                     </div>
                 </div>
             <?php endif; ?>
@@ -215,9 +344,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-gray-700 font-semibold mb-2">WhatsApp</label>
+                            <label class="block text-gray-700 font-semibold mb-2">WhatsApp (10 dígitos)</label>
                             <input type="text" name="whatsapp" 
                                    placeholder="Ej: 4421234567"
+                                   maxlength="10"
+                                   pattern="[0-9]{10}"
                                    class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
@@ -225,13 +356,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <input type="text" name="rfc" 
                                    placeholder="Ej: ABC123456XYZ"
                                    maxlength="13"
-                                   class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 uppercase">
                         </div>
                     </div>
                     
                     <button type="submit" 
                             class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold">
-                        <i class="fas fa-search mr-2"></i>Buscar Empresa
+                        <i class="fas fa-search mr-2"></i>Buscar Empresa o Registro Previo
                     </button>
                 </form>
                 
@@ -264,9 +395,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
                 <?php endif; ?>
                 
-                <form method="POST" class="space-y-6">
+                <form method="POST" class="space-y-6" id="registroForm">
                     <input type="hidden" name="action" value="registrar">
                     <input type="hidden" name="empresa_id" value="<?php echo $empresa_data['id'] ?? ''; ?>">
+                    
+                    <!-- Empresa/Razón Social -->
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Empresa / Razón Social *</label>
+                        <input type="text" name="razon_social" required
+                               value="<?php echo e($empresa_data['razon_social'] ?? ''); ?>"
+                               placeholder="Nombre de la empresa o razón social"
+                               class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
                     
                     <div>
                         <label class="block text-gray-700 font-semibold mb-2">Nombre Completo *</label>
@@ -284,49 +424,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-gray-700 font-semibold mb-2">Teléfono</label>
-                            <input type="text" name="telefono"
-                                   value="<?php echo e($empresa_data['telefono'] ?? ''); ?>"
-                                   placeholder="4421234567"
-                                   class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-gray-700 font-semibold mb-2">WhatsApp</label>
-                            <input type="text" name="whatsapp_registro"
-                                   value="<?php echo e($empresa_data['whatsapp'] ?? ''); ?>"
-                                   placeholder="4421234567"
-                                   class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                        </div>
+                    <!-- WhatsApp obligatorio, 10 dígitos -->
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">WhatsApp * (10 dígitos)</label>
+                        <input type="text" name="whatsapp_registro" required
+                               value="<?php echo e($empresa_data['whatsapp'] ?? ''); ?>"
+                               placeholder="4421234567"
+                               maxlength="10"
+                               pattern="[0-9]{10}"
+                               title="Ingrese exactamente 10 dígitos"
+                               class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">Solo números, sin espacios ni guiones</p>
                     </div>
                     
-                    <div>
-                        <label class="block text-gray-700 font-semibold mb-2">RFC</label>
-                        <input type="text" name="rfc_registro"
+                    <!-- Checkbox de invitado -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" name="es_invitado" id="es_invitado" 
+                                   class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="ml-3 text-gray-700 font-semibold">
+                                Asisto como invitado (no tengo RFC empresarial)
+                            </span>
+                        </label>
+                        <p class="text-sm text-gray-600 mt-2 ml-8">
+                            Si eres invitado personal, marca esta casilla. El RFC no será obligatorio.
+                        </p>
+                    </div>
+                    
+                    <!-- RFC condicional -->
+                    <div id="rfc_container">
+                        <label class="block text-gray-700 font-semibold mb-2">
+                            RFC <span id="rfc_required">*</span>
+                        </label>
+                        <input type="text" name="rfc_registro" id="rfc_registro"
                                value="<?php echo e($empresa_data['rfc'] ?? ''); ?>"
                                placeholder="ABC123456XYZ"
                                maxlength="13"
-                               class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                               class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 uppercase">
+                        <p class="text-sm text-gray-500 mt-1" id="rfc_help">Obligatorio para empresas</p>
                     </div>
                     
                     <div>
                         <label class="block text-gray-700 font-semibold mb-2">
                             Número de Boletos Solicitados
                             <?php if ($empresa_data): ?>
-                            <span class="text-sm font-normal text-gray-500">(para colaboradores con el mismo RFC)</span>
+                            <span class="text-sm font-normal text-gray-500">(para colaboradores)</span>
                             <?php endif; ?>
                         </label>
-                        <input type="number" name="boletos_solicitados" min="1" max="10" value="1"
+                        <input type="number" name="boletos_solicitados" min="1" max="<?php echo $max_boletos; ?>" value="1"
                                class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <p class="text-sm text-gray-500 mt-1">Máximo 10 boletos por registro</p>
+                        <p class="text-sm text-gray-500 mt-1">Máximo <?php echo $max_boletos; ?> boletos por registro</p>
+                    </div>
+                    
+                    <!-- Captcha -->
+                    <div class="bg-gray-50 border border-gray-300 rounded-lg p-4">
+                        <label class="block text-gray-700 font-semibold mb-2">Verificación Anti-Spam *</label>
+                        <p class="text-gray-600 mb-3">
+                            Por favor resuelve: 
+                            <span class="font-bold text-xl text-blue-600">
+                                <?php echo $_SESSION['captcha_evento_num1']; ?> + <?php echo $_SESSION['captcha_evento_num2']; ?> = ?
+                            </span>
+                        </p>
+                        <input type="number" name="captcha_respuesta" required
+                               placeholder="Ingrese el resultado"
+                               class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <!-- Términos y condiciones -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <label class="flex items-start cursor-pointer">
+                            <input type="checkbox" name="terminos" required 
+                                   class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1">
+                            <span class="ml-3 text-gray-700">
+                                Acepto los 
+                                <a href="<?php echo BASE_URL; ?>/terminos.php" target="_blank" class="text-blue-600 hover:underline font-semibold">
+                                    Términos y Condiciones
+                                </a> 
+                                y la 
+                                <a href="<?php echo BASE_URL; ?>/privacidad.php" target="_blank" class="text-blue-600 hover:underline font-semibold">
+                                    Política de Privacidad
+                                </a> *
+                            </span>
+                        </label>
                     </div>
                     
                     <button type="submit" 
-                            class="w-full bg-green-600 text-white py-4 rounded-lg hover:bg-green-700 font-bold text-lg">
+                            class="w-full bg-green-600 text-white py-4 rounded-lg hover:bg-green-700 font-bold text-lg transition">
                         <i class="fas fa-check mr-2"></i>Confirmar Registro
                     </button>
                 </form>
+                
+                <!-- Script para hacer RFC condicional -->
+                <script>
+                    document.getElementById('es_invitado').addEventListener('change', function() {
+                        const rfcInput = document.getElementById('rfc_registro');
+                        const rfcRequired = document.getElementById('rfc_required');
+                        const rfcHelp = document.getElementById('rfc_help');
+                        
+                        if (this.checked) {
+                            rfcInput.removeAttribute('required');
+                            rfcRequired.style.display = 'none';
+                            rfcHelp.textContent = 'Opcional para invitados';
+                            rfcInput.parentElement.classList.add('opacity-75');
+                        } else {
+                            rfcInput.setAttribute('required', 'required');
+                            rfcRequired.style.display = 'inline';
+                            rfcHelp.textContent = 'Obligatorio para empresas';
+                            rfcInput.parentElement.classList.remove('opacity-75');
+                        }
+                    });
+                </script>
             </div>
             <?php endif; ?>
 
