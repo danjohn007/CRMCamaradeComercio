@@ -1,30 +1,91 @@
--- Migration para nuevas funcionalidades del sistema CRM
--- Autor: Sistema CRM CANACO
+-- Migration lista para importar (compatible con MySQL sin usar ADD COLUMN IF NOT EXISTS)
+-- Autor: Sistema CRM CANACO (modificado para compatibilidad)
 -- Fecha: 2025-11-01
--- Descripción: Agrega soporte para registro de pagos con evidencia, calendario, 
+-- Descripción: Agrega soporte para registro de pagos con evidencia, calendario,
 --              actualización de membresías y participantes de eventos
+-- NOTA: Este script comprueba existence de columnas/índices y aplica ADD o MODIFY
+--       según corresponda para evitar errores de importación por duplicados.
 
 USE crm_camara_comercio;
 
--- 1. Agregar campo de evidencia de pago a la tabla pagos
-ALTER TABLE pagos 
-ADD COLUMN IF NOT EXISTS evidencia_pago VARCHAR(255) DEFAULT NULL AFTER notas;
+-- Variable con la base de datos activa
+SET @db := DATABASE();
 
--- 2. Agregar campos de pago a eventos_inscripciones
-ALTER TABLE eventos_inscripciones 
-ADD COLUMN IF NOT EXISTS estado_pago ENUM('SIN_PAGO', 'PENDIENTE', 'COMPLETADO', 'CANCELADO') DEFAULT 'SIN_PAGO' AFTER estado,
-ADD COLUMN IF NOT EXISTS monto_pagado DECIMAL(10,2) DEFAULT 0 AFTER estado_pago,
-ADD COLUMN IF NOT EXISTS fecha_pago DATETIME DEFAULT NULL AFTER monto_pagado,
-ADD COLUMN IF NOT EXISTS referencia_pago VARCHAR(100) DEFAULT NULL AFTER fecha_pago;
+-- 1) pagos.evidencia_pago -> Añadir si no existe, si existe MODIFY para asegurar tipo/default
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'pagos' AND column_name = 'evidencia_pago';
 
--- 3. Agregar índices para mejorar rendimiento de calendario
-ALTER TABLE eventos 
-ADD INDEX IF NOT EXISTS idx_fecha_rango (fecha_inicio, fecha_fin);
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE pagos ADD COLUMN evidencia_pago VARCHAR(255) DEFAULT NULL AFTER notas',
+  'ALTER TABLE pagos MODIFY COLUMN evidencia_pago VARCHAR(255) DEFAULT NULL AFTER notas');
 
-ALTER TABLE empresas 
-ADD INDEX IF NOT EXISTS idx_renovacion_activo (fecha_renovacion, activo);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- 4. Tabla para registro de cambios/upgrades de membresías
+-- 2) eventos_inscripciones: agregar columnas de pago (varias columnas)
+-- estado_pago
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'eventos_inscripciones' AND column_name = 'estado_pago';
+
+SET @sql = IF(@cnt = 0,
+  "ALTER TABLE eventos_inscripciones ADD COLUMN estado_pago ENUM('SIN_PAGO','PENDIENTE','COMPLETADO','CANCELADO') DEFAULT 'SIN_PAGO' AFTER estado",
+  "ALTER TABLE eventos_inscripciones MODIFY COLUMN estado_pago ENUM('SIN_PAGO','PENDIENTE','COMPLETADO','CANCELADO') DEFAULT 'SIN_PAGO' AFTER estado");
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- monto_pagado
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'eventos_inscripciones' AND column_name = 'monto_pagado';
+
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE eventos_inscripciones ADD COLUMN monto_pagado DECIMAL(10,2) DEFAULT 0 AFTER estado_pago',
+  'ALTER TABLE eventos_inscripciones MODIFY COLUMN monto_pagado DECIMAL(10,2) DEFAULT 0 AFTER estado_pago');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- fecha_pago
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'eventos_inscripciones' AND column_name = 'fecha_pago';
+
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE eventos_inscripciones ADD COLUMN fecha_pago DATETIME DEFAULT NULL AFTER monto_pagado',
+  'ALTER TABLE eventos_inscripciones MODIFY COLUMN fecha_pago DATETIME DEFAULT NULL AFTER monto_pagado');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- referencia_pago
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'eventos_inscripciones' AND column_name = 'referencia_pago';
+
+SET @sql = IF(@cnt = 0,
+  "ALTER TABLE eventos_inscripciones ADD COLUMN referencia_pago VARCHAR(100) DEFAULT NULL AFTER fecha_pago",
+  "ALTER TABLE eventos_inscripciones MODIFY COLUMN referencia_pago VARCHAR(100) DEFAULT NULL AFTER fecha_pago");
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 3) Índices para calendario: eventos(fecha_inicio, fecha_fin) y empresas(fecha_renovacion, activo)
+-- idx_fecha_rango en eventos
+SELECT COUNT(*) INTO @cnt FROM information_schema.STATISTICS
+ WHERE table_schema = @db AND table_name = 'eventos' AND index_name = 'idx_fecha_rango';
+
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE eventos ADD INDEX idx_fecha_rango (fecha_inicio, fecha_fin)',
+  'SELECT "index idx_fecha_rango ya existe"');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- idx_renovacion_activo en empresas
+SELECT COUNT(*) INTO @cnt FROM information_schema.STATISTICS
+ WHERE table_schema = @db AND table_name = 'empresas' AND index_name = 'idx_renovacion_activo';
+
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE empresas ADD INDEX idx_renovacion_activo (fecha_renovacion, activo)',
+  'SELECT "index idx_renovacion_activo ya existe"');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 4) Tabla membresias_upgrades (creación segura)
 CREATE TABLE IF NOT EXISTS membresias_upgrades (
     id INT AUTO_INCREMENT PRIMARY KEY,
     empresa_id INT NOT NULL,
@@ -50,7 +111,7 @@ CREATE TABLE IF NOT EXISTS membresias_upgrades (
     INDEX idx_fecha_solicitud (fecha_solicitud)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 5. Tabla para tracking de completitud de perfil
+-- 5) Tabla perfil_completitud
 CREATE TABLE IF NOT EXISTS perfil_completitud (
     id INT AUTO_INCREMENT PRIMARY KEY,
     empresa_id INT NOT NULL UNIQUE,
@@ -61,18 +122,33 @@ CREATE TABLE IF NOT EXISTS perfil_completitud (
     FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 6. Agregar campo para orden de membresías (para determinar niveles superiores)
-ALTER TABLE membresias 
-ADD COLUMN IF NOT EXISTS nivel_orden INT DEFAULT 1 AFTER vigencia_meses,
-ADD INDEX idx_nivel (nivel_orden);
+-- 6) membresias.nivel_orden -> añadir o modificar
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'membresias' AND column_name = 'nivel_orden';
 
--- Actualizar niveles iniciales de membresías existentes (ajustar según necesidad)
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE membresias ADD COLUMN nivel_orden INT DEFAULT 1 AFTER vigencia_meses',
+  'ALTER TABLE membresias MODIFY COLUMN nivel_orden INT DEFAULT 1 AFTER vigencia_meses');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- índice idx_nivel en membresias
+SELECT COUNT(*) INTO @cnt FROM information_schema.STATISTICS
+ WHERE table_schema = @db AND table_name = 'membresias' AND index_name = 'idx_nivel';
+
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE membresias ADD INDEX idx_nivel (nivel_orden)',
+  'SELECT "index idx_nivel ya existe"');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Actualizar niveles iniciales (estas consultas no fallarán aunque no haya coincidencias)
 UPDATE membresias SET nivel_orden = 1 WHERE nombre LIKE '%Básica%' OR nombre LIKE '%Basic%';
 UPDATE membresias SET nivel_orden = 2 WHERE nombre LIKE '%Estándar%' OR nombre LIKE '%Standard%';
 UPDATE membresias SET nivel_orden = 3 WHERE nombre LIKE '%Premium%' OR nombre LIKE '%Oro%' OR nombre LIKE '%Gold%';
 UPDATE membresias SET nivel_orden = 4 WHERE nombre LIKE '%Platinum%' OR nombre LIKE '%Platino%' OR nombre LIKE '%VIP%';
 
--- 7. Agregar configuración de PayPal para membresías si no existe
+-- 7) Configuración PayPal (inserciones seguras)
 INSERT INTO configuracion (clave, valor, descripcion) 
 VALUES ('paypal_client_id', '', 'Client ID de PayPal para pagos')
 ON DUPLICATE KEY UPDATE descripcion = 'Client ID de PayPal para pagos';
@@ -85,11 +161,17 @@ INSERT INTO configuracion (clave, valor, descripcion)
 VALUES ('paypal_mode', 'sandbox', 'Modo de PayPal: sandbox o live')
 ON DUPLICATE KEY UPDATE descripcion = 'Modo de PayPal: sandbox o live';
 
--- 8. Agregar campo costo a eventos si no existe (para eventos con pago)
-ALTER TABLE eventos 
-ADD COLUMN IF NOT EXISTS costo DECIMAL(10,2) DEFAULT 0 AFTER cupo_maximo;
+-- 8) eventos.costo -> Añadir si no existe, si existe MODIFY para asegurar tipo/default
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'eventos' AND column_name = 'costo';
 
--- 9. Crear vista para facilitar consultas de calendario
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE eventos ADD COLUMN costo DECIMAL(10,2) DEFAULT 0 AFTER cupo_maximo',
+  'ALTER TABLE eventos MODIFY COLUMN costo DECIMAL(10,2) DEFAULT 0 AFTER cupo_maximo');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 9) Vista vista_calendario_eventos (CREATE OR REPLACE)
 CREATE OR REPLACE VIEW vista_calendario_eventos AS
 SELECT 
     e.id,
@@ -103,19 +185,19 @@ SELECT
     e.cupo_maximo,
     e.inscritos,
     e.requiere_inscripcion,
-    e.costo,
+    COALESCE(e.costo,0) as costo,
     NULL as empresa_id,
     NULL as empresa_nombre
 FROM eventos e
 WHERE e.activo = 1;
 
--- 10. Crear vista para renovaciones en calendario
+-- 10) Vista vista_calendario_renovaciones
 CREATE OR REPLACE VIEW vista_calendario_renovaciones AS
 SELECT 
     emp.id,
     'RENOVACION' as tipo,
     CONCAT('Renovación: ', emp.razon_social) as titulo,
-    CONCAT('Vencimiento de membresía - ', m.nombre) as descripcion,
+    CONCAT('Vencimiento de membresía - ', COALESCE(m.nombre,'')) as descripcion,
     emp.fecha_renovacion as fecha_inicio,
     emp.fecha_renovacion as fecha_fin,
     emp.direccion_comercial as ubicacion,
@@ -123,7 +205,7 @@ SELECT
     NULL as cupo_maximo,
     NULL as inscritos,
     0 as requiere_inscripcion,
-    m.costo,
+    COALESCE(m.costo,0) as costo,
     emp.id as empresa_id,
     emp.razon_social as empresa_nombre
 FROM empresas emp
@@ -132,31 +214,48 @@ WHERE emp.activo = 1
 AND emp.fecha_renovacion IS NOT NULL
 AND emp.fecha_renovacion >= CURDATE();
 
--- 11. Agregar campos para mejorar el tracking de perfil de empresa
-ALTER TABLE empresas
-ADD COLUMN IF NOT EXISTS porcentaje_perfil DECIMAL(5,2) DEFAULT 0 AFTER descripcion;
+-- 11) empresas.porcentaje_perfil -> añadir o modificar
+SELECT COUNT(*) INTO @cnt FROM information_schema.COLUMNS
+ WHERE table_schema = @db AND table_name = 'empresas' AND column_name = 'porcentaje_perfil';
 
--- Comentarios sobre el uso del sistema
--- La columna evidencia_pago en pagos almacenará la ruta del archivo de evidencia subido
--- Las vistas vista_calendario_eventos y vista_calendario_renovaciones facilitan la obtención de datos para el calendario
--- La tabla membresias_upgrades registra todos los cambios de membresía solicitados
--- La tabla perfil_completitud ayuda a trackear el avance de completitud de perfil
+SET @sql = IF(@cnt = 0,
+  'ALTER TABLE empresas ADD COLUMN porcentaje_perfil DECIMAL(5,2) DEFAULT 0 AFTER descripcion',
+  'ALTER TABLE empresas MODIFY COLUMN porcentaje_perfil DECIMAL(5,2) DEFAULT 0 AFTER descripcion');
 
--- Índices adicionales para optimizar consultas de calendario
-CREATE INDEX IF NOT EXISTS idx_eventos_fecha_tipo ON eventos(fecha_inicio, tipo, activo);
-CREATE INDEX IF NOT EXISTS idx_empresas_renovacion_fecha ON empresas(fecha_renovacion, activo);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- Trigger para actualizar porcentaje de perfil automáticamente
-DELIMITER //
+-- Índices adicionales (comprobación de existencia antes de crear)
+SELECT COUNT(*) INTO @cnt FROM information_schema.STATISTICS
+ WHERE table_schema = @db AND table_name = 'eventos' AND index_name = 'idx_eventos_fecha_tipo';
 
-CREATE TRIGGER IF NOT EXISTS actualizar_porcentaje_perfil_insert
+SET @sql = IF(@cnt = 0,
+  'CREATE INDEX idx_eventos_fecha_tipo ON eventos(fecha_inicio, tipo, activo)',
+  'SELECT "index idx_eventos_fecha_tipo ya existe"');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @cnt FROM information_schema.STATISTICS
+ WHERE table_schema = @db AND table_name = 'empresas' AND index_name = 'idx_empresas_renovacion_fecha';
+
+SET @sql = IF(@cnt = 0,
+  'CREATE INDEX idx_empresas_renovacion_fecha ON empresas(fecha_renovacion, activo)',
+  'SELECT "index idx_empresas_renovacion_fecha ya existe"');
+
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 12) Triggers para actualizar porcentaje de perfil automáticamente
+-- Eliminamos triggers previos si existen y luego los creamos (compatible con MySQL)
+DROP TRIGGER IF EXISTS actualizar_porcentaje_perfil_insert;
+DROP TRIGGER IF EXISTS actualizar_porcentaje_perfil_update;
+
+DELIMITER $$
+CREATE TRIGGER actualizar_porcentaje_perfil_insert
 AFTER INSERT ON empresas
 FOR EACH ROW
 BEGIN
     DECLARE campos_completados INT DEFAULT 0;
     DECLARE campos_totales INT DEFAULT 20;
     
-    -- Contar campos completados (no NULL y no vacíos)
     IF NEW.razon_social IS NOT NULL AND NEW.razon_social != '' THEN SET campos_completados = campos_completados + 1; END IF;
     IF NEW.rfc IS NOT NULL AND NEW.rfc != '' THEN SET campos_completados = campos_completados + 1; END IF;
     IF NEW.email IS NOT NULL AND NEW.email != '' THEN SET campos_completados = campos_completados + 1; END IF;
@@ -178,25 +277,22 @@ BEGIN
     IF NEW.facebook IS NOT NULL AND NEW.facebook != '' THEN SET campos_completados = campos_completados + 1; END IF;
     IF NEW.instagram IS NOT NULL AND NEW.instagram != '' THEN SET campos_completados = campos_completados + 1; END IF;
     
-    -- Actualizar el porcentaje
     UPDATE empresas SET porcentaje_perfil = (campos_completados * 100.0 / campos_totales) WHERE id = NEW.id;
     
-    -- Insertar o actualizar en perfil_completitud
     INSERT INTO perfil_completitud (empresa_id, campos_totales, campos_completados, porcentaje)
     VALUES (NEW.id, campos_totales, campos_completados, (campos_completados * 100.0 / campos_totales))
     ON DUPLICATE KEY UPDATE 
-        campos_completados = campos_completados,
-        porcentaje = (campos_completados * 100.0 / campos_totales);
-END//
+        campos_completados = VALUES(campos_completados),
+        porcentaje = VALUES(porcentaje);
+END$$
 
-CREATE TRIGGER IF NOT EXISTS actualizar_porcentaje_perfil_update
+CREATE TRIGGER actualizar_porcentaje_perfil_update
 AFTER UPDATE ON empresas
 FOR EACH ROW
 BEGIN
     DECLARE campos_completados INT DEFAULT 0;
     DECLARE campos_totales INT DEFAULT 20;
     
-    -- Contar campos completados (no NULL y no vacíos)
     IF NEW.razon_social IS NOT NULL AND NEW.razon_social != '' THEN SET campos_completados = campos_completados + 1; END IF;
     IF NEW.rfc IS NOT NULL AND NEW.rfc != '' THEN SET campos_completados = campos_completados + 1; END IF;
     IF NEW.email IS NOT NULL AND NEW.email != '' THEN SET campos_completados = campos_completados + 1; END IF;
@@ -218,20 +314,17 @@ BEGIN
     IF NEW.facebook IS NOT NULL AND NEW.facebook != '' THEN SET campos_completados = campos_completados + 1; END IF;
     IF NEW.instagram IS NOT NULL AND NEW.instagram != '' THEN SET campos_completados = campos_completados + 1; END IF;
     
-    -- Actualizar el porcentaje
     UPDATE empresas SET porcentaje_perfil = (campos_completados * 100.0 / campos_totales) WHERE id = NEW.id;
     
-    -- Insertar o actualizar en perfil_completitud
     INSERT INTO perfil_completitud (empresa_id, campos_totales, campos_completados, porcentaje)
     VALUES (NEW.id, campos_totales, campos_completados, (campos_completados * 100.0 / campos_totales))
     ON DUPLICATE KEY UPDATE 
-        campos_completados = campos_completados,
-        porcentaje = (campos_completados * 100.0 / campos_totales);
-END//
-
+        campos_completados = VALUES(campos_completados),
+        porcentaje = VALUES(porcentaje);
+END$$
 DELIMITER ;
 
--- Actualizar porcentajes para empresas existentes
+-- 13) Actualizar porcentajes para empresas existentes (insertar o actualizar perfil_completitud)
 INSERT INTO perfil_completitud (empresa_id, campos_totales, campos_completados, porcentaje)
 SELECT 
     id,
