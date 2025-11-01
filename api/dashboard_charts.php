@@ -10,14 +10,20 @@ header('Content-Type: application/json');
 // Verificar autenticación
 if (!isLoggedIn()) {
     http_response_code(401);
-    echo json_encode(['error' => 'No autorizado']);
+    echo json_encode([
+        'success' => false,
+        'error' => 'No autorizado'
+    ]);
     exit;
 }
 
 // Verificar permisos
 if (!hasPermission('AFILADOR')) {
     http_response_code(403);
-    echo json_encode(['error' => 'Sin permisos suficientes']);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Sin permisos suficientes'
+    ]);
     exit;
 }
 
@@ -27,6 +33,25 @@ $db = Database::getInstance()->getConnection();
 // Obtener parámetros de fecha
 $fecha_inicio = $_GET['fecha_inicio'] ?? date('Y-m-01'); // Primer día del mes actual por defecto
 $fecha_fin = $_GET['fecha_fin'] ?? date('Y-m-t'); // Último día del mes actual por defecto
+
+// Validar formato de fechas
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_inicio) || !strtotime($fecha_inicio)) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Formato de fecha_inicio inválido. Use YYYY-MM-DD'
+    ]);
+    exit;
+}
+
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_fin) || !strtotime($fecha_fin)) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Formato de fecha_fin inválido. Use YYYY-MM-DD'
+    ]);
+    exit;
+}
 
 try {
     $data = [];
@@ -140,6 +165,7 @@ try {
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode([
+        'success' => false,
         'error' => 'Error al obtener datos de gráficas',
         'message' => $e->getMessage()
     ]);

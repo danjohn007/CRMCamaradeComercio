@@ -507,6 +507,9 @@ const colorPalette = [
     chartColors.cyan
 ];
 
+// Almacenar referencias a los gráficos para poder actualizarlos
+let chartInstances = {};
+
 // 1. Gráfica de Empresas por Membresía (Doughnut)
 <?php if (!empty($empresasPorMembresia)): ?>
 chartInstances.chartMembresias = new Chart(document.getElementById('chartMembresias'), {
@@ -780,9 +783,6 @@ chartInstances.chartCiudades = new Chart(document.getElementById('chartCiudades'
 });
 <?php endif; ?>
 
-// Almacenar referencias a los gráficos para poder actualizarlos
-let chartInstances = {};
-
 // Función para inicializar las fechas con el mes actual
 function initializeDateFilter() {
     const now = new Date();
@@ -812,7 +812,7 @@ async function actualizarGraficas() {
         // Mostrar indicador de carga
         document.body.style.cursor = 'wait';
         
-        const response = await fetch(`<?php echo BASE_URL; ?>/api/dashboard_charts.php?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+        const response = await fetch(`<?php echo BASE_URL; ?>/api/dashboard_charts.php?fecha_inicio=${encodeURIComponent(fechaInicio)}&fecha_fin=${encodeURIComponent(fechaFin)}`);
         const result = await response.json();
         
         if (!result.success) {
