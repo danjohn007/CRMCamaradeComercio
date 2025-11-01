@@ -230,7 +230,11 @@ function getConfiguracion($clave = null) {
  * Escapar output para HTML
  */
 function e($string) {
-    return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
+    // Manejar valores null y vacíos para evitar deprecation warning en PHP 8.1+
+    if ($string === null) {
+        return '';
+    }
+    return htmlspecialchars((string)$string, ENT_QUOTES, 'UTF-8');
 }
 
 /**

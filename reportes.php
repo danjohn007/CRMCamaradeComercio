@@ -332,7 +332,7 @@ include __DIR__ . '/app/views/layouts/header.php';
 
     <!-- Ingresos por sector -->
     <?php if (!empty($ingresosPorSector)): ?>
-    <div class="bg-white rounded-lg shadow-md p-6">
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 class="text-xl font-bold text-gray-800 mb-4">Ingresos por Sector</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <?php foreach ($ingresosPorSector as $item): ?>
@@ -343,6 +343,23 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
             <?php endforeach; ?>
         </div>
+    </div>
+    
+    <!-- Gráficas de Ingresos -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Gráfica 1: Ingresos por Membresía (Bar Chart) -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Ingresos por Membresía</h2>
+            <canvas id="chartIngresosMembresia" height="300"></canvas>
+        </div>
+        
+        <!-- Gráfica 2: Tendencia de Ingresos Mensuales (Line Chart) -->
+        <?php if (!empty($ingresosPorMes)): ?>
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Tendencia de Ingresos</h2>
+            <canvas id="chartTendenciaIngresos" height="300"></canvas>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
@@ -410,7 +427,7 @@ include __DIR__ . '/app/views/layouts/header.php';
 
     <?php elseif ($tipo === 'empresas'): ?>
     <!-- Estadísticas de Empresas -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <!-- Empresas por sector -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Empresas por Sector</h2>
@@ -459,6 +476,23 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <?php endforeach; ?>
             </div>
         </div>
+    </div>
+    
+    <!-- Gráficas de Empresas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Gráfica 3: Distribución por Sector (Pie Chart) -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Distribución por Sector</h2>
+            <canvas id="chartEmpresasSector" height="300"></canvas>
+        </div>
+        
+        <!-- Gráfica 4: Crecimiento de Afiliaciones (Line Chart) -->
+        <?php if (!empty($nuevasEmpresasPorMes)): ?>
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Crecimiento de Afiliaciones</h2>
+            <canvas id="chartCrecimientoEmpresas" height="300"></canvas>
+        </div>
+        <?php endif; ?>
     </div>
 
     <?php elseif ($tipo === 'requerimientos'): ?>
@@ -545,5 +579,205 @@ include __DIR__ . '/app/views/layouts/header.php';
         </button>
     </div>
 </div>
+
+<script>
+// Configuración de colores para las gráficas
+const chartColors = {
+    primary: '#1E40AF',
+    secondary: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    info: '#3B82F6',
+    purple: '#8B5CF6',
+    pink: '#EC4899',
+    indigo: '#6366F1',
+    teal: '#14B8A6',
+    cyan: '#06B6D4'
+};
+
+const colorPalette = [
+    chartColors.primary,
+    chartColors.secondary,
+    chartColors.info,
+    chartColors.purple,
+    chartColors.warning,
+    chartColors.danger,
+    chartColors.pink,
+    chartColors.indigo,
+    chartColors.teal,
+    chartColors.cyan
+];
+
+<?php if ($tipo === 'ingresos'): ?>
+// Gráfica 1: Ingresos por Membresía (Bar Chart)
+<?php if (!empty($ingresosPorMembresia)): ?>
+new Chart(document.getElementById('chartIngresosMembresia'), {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode(array_column($ingresosPorMembresia, 'nombre')); ?>,
+        datasets: [{
+            label: 'Ingresos',
+            data: <?php echo json_encode(array_column($ingresosPorMembresia, 'total')); ?>,
+            backgroundColor: colorPalette,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Ingresos: $' + context.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toLocaleString('es-MX');
+                    }
+                }
+            }
+        }
+    }
+});
+<?php endif; ?>
+
+// Gráfica 2: Tendencia de Ingresos Mensuales (Line Chart)
+<?php if (!empty($ingresosPorMes)): ?>
+new Chart(document.getElementById('chartTendenciaIngresos'), {
+    type: 'line',
+    data: {
+        labels: <?php echo json_encode(array_map(function($item) { 
+            return date('M Y', strtotime($item['mes'] . '-01')); 
+        }, $ingresosPorMes)); ?>,
+        datasets: [{
+            label: 'Ingresos Mensuales',
+            data: <?php echo json_encode(array_column($ingresosPorMes, 'total')); ?>,
+            borderColor: chartColors.secondary,
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: chartColors.secondary
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true, position: 'top' },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Ingresos: $' + context.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toLocaleString('es-MX');
+                    }
+                }
+            }
+        }
+    }
+});
+<?php endif; ?>
+<?php endif; ?>
+
+<?php if ($tipo === 'empresas'): ?>
+// Gráfica 3: Distribución por Sector (Pie Chart)
+<?php if (!empty($empresasPorSector)): ?>
+new Chart(document.getElementById('chartEmpresasSector'), {
+    type: 'pie',
+    data: {
+        labels: <?php echo json_encode(array_column($empresasPorSector, 'nombre')); ?>,
+        datasets: [{
+            data: <?php echo json_encode(array_column($empresasPorSector, 'cantidad')); ?>,
+            backgroundColor: colorPalette,
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'right',
+                labels: { padding: 10, font: { size: 11 } }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                        return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                    }
+                }
+            }
+        }
+    }
+});
+<?php endif; ?>
+
+// Gráfica 4: Crecimiento de Afiliaciones (Line Chart)
+<?php if (!empty($nuevasEmpresasPorMes)): ?>
+new Chart(document.getElementById('chartCrecimientoEmpresas'), {
+    type: 'line',
+    data: {
+        labels: <?php echo json_encode(array_map(function($item) { 
+            return date('M Y', strtotime($item['mes'] . '-01')); 
+        }, $nuevasEmpresasPorMes)); ?>,
+        datasets: [{
+            label: 'Nuevas Afiliaciones',
+            data: <?php echo json_encode(array_column($nuevasEmpresasPorMes, 'cantidad')); ?>,
+            borderColor: chartColors.purple,
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: chartColors.purple
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true, position: 'top' },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Nuevas: ' + context.parsed.y + ' empresas';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { precision: 0 }
+            }
+        }
+    }
+});
+<?php endif; ?>
+<?php endif; ?>
+</script>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>
