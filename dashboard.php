@@ -73,6 +73,75 @@ try {
     $stmt->execute();
     $proximos_eventos = $stmt->fetchAll();
     
+    // Datos para gráficas (solo para roles administrativos)
+    if (hasPermission('AFILADOR')) {
+        // 1. Empresas por membresía
+        $stmt = $db->query("SELECT m.nombre, COUNT(e.id) as cantidad 
+                           FROM membresias m 
+                           LEFT JOIN empresas e ON m.id = e.membresia_id AND e.activo = 1 
+                           WHERE m.activo = 1 
+                           GROUP BY m.id 
+                           ORDER BY cantidad DESC");
+        $empresasPorMembresia = $stmt->fetchAll();
+        
+        // 2. Empresas por sector
+        $stmt = $db->query("SELECT s.nombre, COUNT(e.id) as cantidad 
+                           FROM sectores s 
+                           LEFT JOIN empresas e ON s.id = e.sector_id AND e.activo = 1 
+                           WHERE s.activo = 1 
+                           GROUP BY s.id 
+                           ORDER BY cantidad DESC 
+                           LIMIT 10");
+        $empresasPorSector = $stmt->fetchAll();
+        
+        // 3. Ingresos por mes (últimos 6 meses)
+        $stmt = $db->query("SELECT DATE_FORMAT(fecha_pago, '%Y-%m') as mes, 
+                           DATE_FORMAT(fecha_pago, '%b') as mes_nombre,
+                           SUM(monto) as total 
+                           FROM pagos 
+                           WHERE fecha_pago >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) 
+                           AND estado = 'COMPLETADO'
+                           GROUP BY mes 
+                           ORDER BY mes ASC");
+        $ingresosPorMes = $stmt->fetchAll();
+        
+        // 4. Nuevas empresas por mes (últimos 6 meses)
+        $stmt = $db->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as mes,
+                           DATE_FORMAT(created_at, '%b') as mes_nombre,
+                           COUNT(*) as cantidad 
+                           FROM empresas 
+                           WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+                           GROUP BY mes 
+                           ORDER BY mes ASC");
+        $nuevasEmpresasPorMes = $stmt->fetchAll();
+        
+        // 5. Estado de empresas (activas vs vencidas)
+        $empresasActivas = $stats['empresas_activas'] ?? 0;
+        $empresasVencidas = $stats['empresas_vencidas'] ?? 0;
+        $empresasProximasVencer = $stats['proximas_vencer'] ?? 0;
+        
+        // 6. Eventos por tipo
+        $stmt = $db->query("SELECT tipo, COUNT(*) as cantidad 
+                           FROM eventos 
+                           GROUP BY tipo");
+        $eventosPorTipo = $stmt->fetchAll();
+        
+        // 7. Requerimientos por estado
+        $stmt = $db->query("SELECT estado, COUNT(*) as cantidad 
+                           FROM requerimientos 
+                           GROUP BY estado");
+        $requerimientosPorEstado = $stmt->fetchAll();
+        
+        // 8. Top 10 ciudades con más empresas
+        $stmt = $db->query("SELECT ciudad, COUNT(*) as cantidad 
+                           FROM empresas 
+                           WHERE activo = 1 AND ciudad IS NOT NULL AND ciudad != ''
+                           GROUP BY ciudad 
+                           ORDER BY cantidad DESC 
+                           LIMIT 10");
+        $empresasPorCiudad = $stmt->fetchAll();
+    }
+    
 } catch (Exception $e) {
     $error = "Error al cargar estadísticas: " . $e->getMessage();
 }
@@ -217,6 +286,73 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
         </div>
     </div>
+
+    <!-- Sección de Gráficas Analíticas -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+            <i class="fas fa-chart-line mr-2"></i>Análisis y Tendencias
+        </h2>
+        
+        <!-- Gráficas - Fila 1 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Gráfica 1: Empresas por Membresía -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Empresas por Membresía</h3>
+                <canvas id="chartMembresias" height="250"></canvas>
+            </div>
+            
+            <!-- Gráfica 2: Empresas por Sector -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Top 10 Sectores</h3>
+                <canvas id="chartSectores" height="250"></canvas>
+            </div>
+        </div>
+        
+        <!-- Gráficas - Fila 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Gráfica 3: Ingresos por Mes -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Ingresos Últimos 6 Meses</h3>
+                <canvas id="chartIngresos" height="250"></canvas>
+            </div>
+            
+            <!-- Gráfica 4: Nuevas Empresas por Mes -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Nuevas Afiliaciones (6 Meses)</h3>
+                <canvas id="chartNuevasEmpresas" height="250"></canvas>
+            </div>
+        </div>
+        
+        <!-- Gráficas - Fila 3 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Gráfica 5: Estado de Empresas -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Estado de Membresías</h3>
+                <canvas id="chartEstadoEmpresas" height="250"></canvas>
+            </div>
+            
+            <!-- Gráfica 6: Eventos por Tipo -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Eventos por Tipo</h3>
+                <canvas id="chartEventos" height="250"></canvas>
+            </div>
+        </div>
+        
+        <!-- Gráficas - Fila 4 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Gráfica 7: Requerimientos por Estado -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Requerimientos por Estado</h3>
+                <canvas id="chartRequerimientos" height="250"></canvas>
+            </div>
+            
+            <!-- Gráfica 8: Empresas por Ciudad -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Top 10 Ciudades</h3>
+                <canvas id="chartCiudades" height="250"></canvas>
+            </div>
+        </div>
+    </div>
     <?php else: ?>
     <!-- Dashboard para Entidad Comercial -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -290,5 +426,309 @@ include __DIR__ . '/app/views/layouts/header.php';
     </div>
     <?php endif; ?>
 </div>
+
+<?php if (hasPermission('AFILADOR')): ?>
+<script>
+// Configuración de colores
+const chartColors = {
+    primary: '#1E40AF',
+    secondary: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    info: '#3B82F6',
+    purple: '#8B5CF6',
+    pink: '#EC4899',
+    indigo: '#6366F1',
+    teal: '#14B8A6',
+    cyan: '#06B6D4'
+};
+
+const colorPalette = [
+    chartColors.primary,
+    chartColors.secondary,
+    chartColors.info,
+    chartColors.purple,
+    chartColors.warning,
+    chartColors.danger,
+    chartColors.pink,
+    chartColors.indigo,
+    chartColors.teal,
+    chartColors.cyan
+];
+
+// 1. Gráfica de Empresas por Membresía (Doughnut)
+<?php if (!empty($empresasPorMembresia)): ?>
+new Chart(document.getElementById('chartMembresias'), {
+    type: 'doughnut',
+    data: {
+        labels: <?php echo json_encode(array_column($empresasPorMembresia, 'nombre')); ?>,
+        datasets: [{
+            data: <?php echo json_encode(array_column($empresasPorMembresia, 'cantidad')); ?>,
+            backgroundColor: colorPalette,
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'right',
+                labels: { padding: 10, font: { size: 12 } }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.label + ': ' + context.parsed + ' empresas';
+                    }
+                }
+            }
+        }
+    }
+});
+<?php endif; ?>
+
+// 2. Gráfica de Empresas por Sector (Bar horizontal)
+<?php if (!empty($empresasPorSector)): ?>
+new Chart(document.getElementById('chartSectores'), {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode(array_column($empresasPorSector, 'nombre')); ?>,
+        datasets: [{
+            label: 'Empresas',
+            data: <?php echo json_encode(array_column($empresasPorSector, 'cantidad')); ?>,
+            backgroundColor: chartColors.info,
+            borderColor: chartColors.primary,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Empresas: ' + context.parsed.x;
+                    }
+                }
+            }
+        },
+        scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    }
+});
+<?php endif; ?>
+
+// 3. Gráfica de Ingresos por Mes (Line)
+<?php if (!empty($ingresosPorMes)): ?>
+new Chart(document.getElementById('chartIngresos'), {
+    type: 'line',
+    data: {
+        labels: <?php echo json_encode(array_column($ingresosPorMes, 'mes_nombre')); ?>,
+        datasets: [{
+            label: 'Ingresos',
+            data: <?php echo json_encode(array_column($ingresosPorMes, 'total')); ?>,
+            borderColor: chartColors.secondary,
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Ingresos: $' + context.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return '$' + value.toLocaleString('es-MX');
+                    }
+                }
+            }
+        }
+    }
+});
+<?php endif; ?>
+
+// 4. Gráfica de Nuevas Empresas por Mes (Bar)
+<?php if (!empty($nuevasEmpresasPorMes)): ?>
+new Chart(document.getElementById('chartNuevasEmpresas'), {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode(array_column($nuevasEmpresasPorMes, 'mes_nombre')); ?>,
+        datasets: [{
+            label: 'Nuevas Afiliaciones',
+            data: <?php echo json_encode(array_column($nuevasEmpresasPorMes, 'cantidad')); ?>,
+            backgroundColor: chartColors.purple,
+            borderColor: chartColors.purple,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Nuevas: ' + context.parsed.y + ' empresas';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    }
+});
+<?php endif; ?>
+
+// 5. Gráfica de Estado de Empresas (Pie)
+new Chart(document.getElementById('chartEstadoEmpresas'), {
+    type: 'pie',
+    data: {
+        labels: ['Activas', 'Próximas a Vencer', 'Vencidas'],
+        datasets: [{
+            data: [
+                <?php echo $empresasActivas; ?>,
+                <?php echo $empresasProximasVencer; ?>,
+                <?php echo $empresasVencidas; ?>
+            ],
+            backgroundColor: [
+                chartColors.secondary,
+                chartColors.warning,
+                chartColors.danger
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { padding: 15, font: { size: 12 } }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                        return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// 6. Gráfica de Eventos por Tipo (Doughnut)
+<?php if (!empty($eventosPorTipo)): ?>
+new Chart(document.getElementById('chartEventos'), {
+    type: 'doughnut',
+    data: {
+        labels: <?php echo json_encode(array_column($eventosPorTipo, 'tipo')); ?>,
+        datasets: [{
+            data: <?php echo json_encode(array_column($eventosPorTipo, 'cantidad')); ?>,
+            backgroundColor: [chartColors.info, chartColors.warning, chartColors.purple],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { padding: 15, font: { size: 12 } }
+            }
+        }
+    }
+});
+<?php endif; ?>
+
+// 7. Gráfica de Requerimientos por Estado (Bar)
+<?php if (!empty($requerimientosPorEstado)): ?>
+new Chart(document.getElementById('chartRequerimientos'), {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode(array_column($requerimientosPorEstado, 'estado')); ?>,
+        datasets: [{
+            label: 'Requerimientos',
+            data: <?php echo json_encode(array_column($requerimientosPorEstado, 'cantidad')); ?>,
+            backgroundColor: [
+                chartColors.warning,
+                chartColors.secondary,
+                chartColors.danger,
+                chartColors.info
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    }
+});
+<?php endif; ?>
+
+// 8. Gráfica de Empresas por Ciudad (Bar horizontal)
+<?php if (!empty($empresasPorCiudad)): ?>
+new Chart(document.getElementById('chartCiudades'), {
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode(array_column($empresasPorCiudad, 'ciudad')); ?>,
+        datasets: [{
+            label: 'Empresas',
+            data: <?php echo json_encode(array_column($empresasPorCiudad, 'cantidad')); ?>,
+            backgroundColor: chartColors.teal,
+            borderColor: chartColors.cyan,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    }
+});
+<?php endif; ?>
+</script>
+<?php endif; ?>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>
