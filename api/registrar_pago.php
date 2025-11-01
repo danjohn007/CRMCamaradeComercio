@@ -81,7 +81,7 @@ try {
     // Procesar evidencia si se subió
     $evidencia_pago = null;
     if (isset($_FILES['evidencia']) && $_FILES['evidencia']['error'] === UPLOAD_ERR_OK) {
-        $result = uploadFile($_FILES['evidencia'], ['jpg', 'jpeg', 'png', 'pdf'], 5242880); // 5MB max
+        $result = uploadFile($_FILES['evidencia'], ['jpg', 'jpeg', 'png', 'pdf'], MAX_FILE_SIZE);
         if ($result['success']) {
             $evidencia_pago = $result['filename'];
         } else {

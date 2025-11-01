@@ -268,7 +268,9 @@ include __DIR__ . '/app/views/layouts/header.php';
 </div>
 
 <!-- PayPal SDK -->
-<script src="https://www.paypal.com/sdk/js?client-id=<?php echo $config_paypal['paypal_client_id'] ?? 'YOUR_CLIENT_ID'; ?>&currency=MXN"></script>
+<?php if (!empty($config_paypal['paypal_client_id'])): ?>
+<script src="https://www.paypal.com/sdk/js?client-id=<?php echo $config_paypal['paypal_client_id']; ?>&currency=MXN"></script>
+<?php endif; ?>
 
 <script>
 let paypalButtonRendered = false;
@@ -277,10 +279,17 @@ function abrirModalUpgrade(membresiaId, membresiaNombre, monto) {
     document.getElementById('nueva_membresia_id').value = membresiaId;
     document.getElementById('nueva_membresia_nombre').textContent = membresiaNombre;
     document.getElementById('monto_upgrade').textContent = '$' + parseFloat(monto).toFixed(2);
+    
+    // Verificar que PayPal esté configurado
+    if (typeof paypal === 'undefined') {
+        showMessage('error', 'PayPal no está configurado correctamente. Contacte al administrador.');
+        return;
+    }
+    
     document.getElementById('modalUpgrade').classList.remove('hidden');
     
     // Renderizar botón de PayPal si aún no se ha hecho
-    if (!paypalButtonRendered && typeof paypal !== 'undefined') {
+    if (!paypalButtonRendered) {
         renderPayPalButton(monto, membresiaId);
         paypalButtonRendered = true;
     }

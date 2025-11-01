@@ -8,8 +8,7 @@ USE crm_camara_comercio;
 
 -- 1. Agregar campo de evidencia de pago a la tabla pagos
 ALTER TABLE pagos 
-ADD COLUMN IF NOT EXISTS evidencia_pago VARCHAR(255) DEFAULT NULL AFTER notas,
-ADD INDEX idx_evidencia (evidencia_pago);
+ADD COLUMN IF NOT EXISTS evidencia_pago VARCHAR(255) DEFAULT NULL AFTER notas;
 
 -- 2. Agregar campos de pago a eventos_inscripciones
 ALTER TABLE eventos_inscripciones 

@@ -889,8 +889,6 @@ if (!$empresa) {
 
 <script>
 function abrirModalPago(empresaId, empresaNombre) {
-    document.getElementById('empresa_id').value = empresaId;
-    document.getElementById('empresa_nombre').value = empresaNombre;
     document.getElementById('formPago').reset();
     document.getElementById('empresa_id').value = empresaId;
     document.getElementById('empresa_nombre').value = empresaNombre;
