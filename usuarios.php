@@ -1,21 +1,14 @@
 <?php
-session_start();
-require_once 'config/database.php';
-require_once 'app/helpers/functions.php';
+/**
+ * Módulo de gestión de usuarios del sistema
+ */
+require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/config/database.php';
 
-// Verificar autenticación
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/login.php');
-    exit();
-}
+requirePermission('DIRECCION');
 
-// Solo PRESIDENCIA y Dirección pueden gestionar usuarios
-if ($_SESSION['user_rol'] !== 'PRESIDENCIA' && $_SESSION['user_rol'] !== 'DIRECCION') {
-    header('Location: ' . BASE_URL . '/dashboard.php');
-    exit();
-}
-
-$conn = getDBConnection();
+$user = getCurrentUser();
+$db = Database::getInstance()->getConnection();
 $action = $_GET['action'] ?? 'list';
 $message = '';
 $error = '';
@@ -28,24 +21,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'create') {
     $rol = sanitize($_POST['rol']);
     $activo = isset($_POST['activo']) ? 1 : 0;
     
-    // Validar que no exista el email
-    $stmt = $conn->prepare("SELECT id FROM usuarios WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    if ($stmt->get_result()->num_rows > 0) {
-        $error = "El email ya está registrado en el sistema.";
-    } else {
-        $password_hash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $conn->prepare("INSERT INTO usuarios (nombre, email, password, rol, activo, fecha_registro) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("ssssi", $nombre, $email, $password_hash, $rol, $activo);
-        
-        if ($stmt->execute()) {
-            registrarAuditoria($conn, $_SESSION['user_id'], 'CREATE', 'usuarios', $stmt->insert_id, 
-                "Nuevo usuario: $nombre ($rol)");
-            $message = "Usuario creado exitosamente.";
+    try {
+        // Validar que no exista el email
+        $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
+            $error = "El email ya está registrado en el sistema.";
         } else {
-            $error = "Error al crear usuario: " . $conn->error;
+            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $db->prepare("INSERT INTO usuarios (nombre, email, password, rol, activo, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([$nombre, $email, $password_hash, $rol, $activo]);
+            
+            $usuario_id = $db->lastInsertId();
+            
+            // Registrar auditoría
+            $stmt_audit = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, descripcion) VALUES (?, 'CREATE', 'usuarios', ?, ?)");
+            $stmt_audit->execute([$user['id'], $usuario_id, "Nuevo usuario: $nombre ($rol)"]);
+            
+            $message = "Usuario creado exitosamente.";
         }
+    } catch (Exception $e) {
+        $error = "Error al crear usuario: " . $e->getMessage();
     }
 }
 
@@ -57,29 +53,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update') {
     $rol = sanitize($_POST['rol']);
     $activo = isset($_POST['activo']) ? 1 : 0;
     
-    // Validar que no exista el email en otro usuario
-    $stmt = $conn->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
-    $stmt->bind_param("si", $email, $id);
-    $stmt->execute();
-    if ($stmt->get_result()->num_rows > 0) {
-        $error = "El email ya está registrado en otro usuario.";
-    } else {
-        if (!empty($_POST['password'])) {
-            $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE usuarios SET nombre = ?, email = ?, password = ?, rol = ?, activo = ? WHERE id = ?");
-            $stmt->bind_param("ssssii", $nombre, $email, $password_hash, $rol, $activo, $id);
+    try {
+        // Validar que no exista el email en otro usuario
+        $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
+        $stmt->execute([$email, $id]);
+        if ($stmt->fetch()) {
+            $error = "El email ya está registrado en otro usuario.";
         } else {
-            $stmt = $conn->prepare("UPDATE usuarios SET nombre = ?, email = ?, rol = ?, activo = ? WHERE id = ?");
-            $stmt->bind_param("sssii", $nombre, $email, $rol, $activo, $id);
-        }
-        
-        if ($stmt->execute()) {
-            registrarAuditoria($conn, $_SESSION['user_id'], 'UPDATE', 'usuarios', $id, 
-                "Usuario actualizado: $nombre");
+            if (!empty($_POST['password'])) {
+                $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
+                $stmt = $db->prepare("UPDATE usuarios SET nombre = ?, email = ?, password = ?, rol = ?, activo = ? WHERE id = ?");
+                $stmt->execute([$nombre, $email, $password_hash, $rol, $activo, $id]);
+            } else {
+                $stmt = $db->prepare("UPDATE usuarios SET nombre = ?, email = ?, rol = ?, activo = ? WHERE id = ?");
+                $stmt->execute([$nombre, $email, $rol, $activo, $id]);
+            }
+            
+            // Registrar auditoría
+            $stmt_audit = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, descripcion) VALUES (?, 'UPDATE', 'usuarios', ?, ?)");
+            $stmt_audit->execute([$user['id'], $id, "Usuario actualizado: $nombre"]);
+            
             $message = "Usuario actualizado exitosamente.";
-        } else {
-            $error = "Error al actualizar usuario: " . $conn->error;
         }
+    } catch (Exception $e) {
+        $error = "Error al actualizar usuario: " . $e->getMessage();
     }
 }
 
@@ -87,20 +84,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update') {
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     
-    // No permitir eliminar al usuario actual
-    if ($id === $_SESSION['user_id']) {
-        $error = "No puedes eliminar tu propio usuario.";
-    } else {
-        $stmt = $conn->prepare("DELETE FROM usuarios WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        
-        if ($stmt->execute()) {
-            registrarAuditoria($conn, $_SESSION['user_id'], 'DELETE', 'usuarios', $id, 
-                "Usuario eliminado ID: $id");
-            $message = "Usuario eliminado exitosamente.";
+    try {
+        // No permitir eliminar al usuario actual
+        if ($id === $user['id']) {
+            $error = "No puedes eliminar tu propio usuario.";
         } else {
-            $error = "Error al eliminar usuario: " . $conn->error;
+            $stmt = $db->prepare("DELETE FROM usuarios WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // Registrar auditoría
+            $stmt_audit = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, descripcion) VALUES (?, 'DELETE', 'usuarios', ?, ?)");
+            $stmt_audit->execute([$user['id'], $id, "Usuario eliminado ID: $id"]);
+            
+            $message = "Usuario eliminado exitosamente.";
         }
+    } catch (Exception $e) {
+        $error = "Error al eliminar usuario: " . $e->getMessage();
     }
     $action = 'list';
 }
@@ -109,44 +108,36 @@ if ($action === 'delete' && isset($_GET['id'])) {
 $usuario_edit = null;
 if ($action === 'edit' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    $stmt = $conn->prepare("SELECT * FROM usuarios WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $usuario_edit = $stmt->get_result()->fetch_assoc();
+    $stmt = $db->prepare("SELECT * FROM usuarios WHERE id = ?");
+    $stmt->execute([$id]);
+    $usuario_edit = $stmt->fetch();
 }
 
 // Listar usuarios con filtros
 $where = "1=1";
 $params = [];
-$types = "";
 
 if (!empty($_GET['search'])) {
     $search = "%" . sanitize($_GET['search']) . "%";
     $where .= " AND (nombre LIKE ? OR email LIKE ?)";
     $params[] = $search;
     $params[] = $search;
-    $types .= "ss";
 }
 
 if (!empty($_GET['rol'])) {
     $where .= " AND rol = ?";
     $params[] = sanitize($_GET['rol']);
-    $types .= "s";
 }
 
 if (isset($_GET['activo']) && $_GET['activo'] !== '') {
     $where .= " AND activo = ?";
     $params[] = intval($_GET['activo']);
-    $types .= "i";
 }
 
-$query = "SELECT * FROM usuarios WHERE $where ORDER BY fecha_registro DESC";
-$stmt = $conn->prepare($query);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$usuarios = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$query = "SELECT * FROM usuarios WHERE $where ORDER BY created_at DESC";
+$stmt = $db->prepare($query);
+$stmt->execute($params);
+$usuarios = $stmt->fetchAll();
 
 $roles_disponibles = ['PRESIDENCIA', 'DIRECCION', 'CONSEJERO', 'AFILADOR', 'CAPTURISTA', 'ENTIDAD_COMERCIAL', 'EMPRESA_TRACTORA'];
 
