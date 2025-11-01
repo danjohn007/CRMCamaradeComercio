@@ -232,7 +232,7 @@ include 'app/views/layouts/header.php';
                             <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?= date('d/m/Y', strtotime($user['fecha_registro'])) ?>
+                            <?= $user['created_at'] ? date('d/m/Y', strtotime($user['created_at'])) : 'N/A' ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <?= $user['ultimo_acceso'] ? date('d/m/Y H:i', strtotime($user['ultimo_acceso'])) : 'Nunca' ?>
