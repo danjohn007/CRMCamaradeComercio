@@ -51,6 +51,15 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Verificar si la columna costo existe en la tabla eventos
+$costo_column_exists = false;
+try {
+    $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'costo'");
+    $costo_column_exists = $stmt->fetch() !== false;
+} catch (Exception $e) {
+    $costo_column_exists = false;
+}
+
 // Procesar formulario de nuevo evento o edición
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) && hasPermission('DIRECCION')) {
     $data = [
@@ -61,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
         'ubicacion' => sanitize($_POST['ubicacion'] ?? ''),
         'tipo' => $_POST['tipo'] ?? 'PUBLICO',
         'cupo_maximo' => $_POST['cupo_maximo'] ? (int)$_POST['cupo_maximo'] : null,
-        'costo' => $_POST['costo'] ? (float)$_POST['costo'] : 0,
+        'costo' => ($costo_column_exists && isset($_POST['costo'])) ? (float)$_POST['costo'] : 0,
         'requiere_inscripcion' => isset($_POST['requiere_inscripcion']) ? 1 : 0,
         'imagen' => null
     ];
@@ -79,41 +88,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
     if (!$error) {
         try {
             if ($action === 'new') {
-                $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, imagen, requiere_inscripcion, creado_por) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                // Construir SQL dinámicamente basado en si existe la columna costo
+                if ($costo_column_exists) {
+                    $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, imagen, requiere_inscripcion, creado_por) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params = [
+                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], $data['imagen'],
+                        $data['requiere_inscripcion'], $user['id']
+                    ];
+                } else {
+                    $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, imagen, requiere_inscripcion, creado_por) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params = [
+                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['imagen'],
+                        $data['requiere_inscripcion'], $user['id']
+                    ];
+                }
                 
                 $stmt = $db->prepare($sql);
-                $stmt->execute([
-                    $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
-                    $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], $data['imagen'],
-                    $data['requiere_inscripcion'], $user['id']
-                ]);
+                $stmt->execute($params);
                 
                 $success = 'Evento creado exitosamente';
                 $action = 'list';
             } else {
-                // Si se subió una nueva imagen, incluirla en el UPDATE
+                // UPDATE para edición
                 if ($data['imagen']) {
-                    $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
-                            ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
-                    
-                    $stmt = $db->prepare($sql);
-                    $stmt->execute([
-                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
-                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], $data['imagen'],
-                        $data['requiere_inscripcion'], $id
-                    ]);
+                    // Con nueva imagen
+                    if ($costo_column_exists) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], $data['imagen'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    } else {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['imagen'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    }
                 } else {
-                    $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
-                            ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, requiere_inscripcion = ? WHERE id = ?";
-                    
-                    $stmt = $db->prepare($sql);
-                    $stmt->execute([
-                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
-                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'],
-                        $data['requiere_inscripcion'], $id
-                    ]);
+                    // Sin nueva imagen
+                    if ($costo_column_exists) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    } else {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    }
                 }
+                
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
                 
                 $success = 'Evento actualizado exitosamente';
                 $action = 'list';
@@ -366,7 +408,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                 </div>
                 <?php endif; ?>
 
-                <?php if ($evento['costo']): ?>
+                <?php if (isset($evento['costo']) && $evento['costo'] > 0): ?>
                 <div class="mb-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-3">Costo</h2>
                     <div class="flex items-center text-gray-600">
