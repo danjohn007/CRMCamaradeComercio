@@ -32,6 +32,23 @@ if ($action === 'suspend' && $id) {
     }
 }
 
+// Activar empresa
+if ($action === 'activate' && $id) {
+    try {
+        $stmt = $db->prepare("UPDATE empresas SET activo = 1 WHERE id = ?");
+        $stmt->execute([$id]);
+        
+        // Registrar en auditoría
+        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'ACTIVATE_EMPRESA', 'empresas', ?)");
+        $stmt->execute([$user['id'], $id]);
+        
+        $success = 'Empresa activada exitosamente';
+        $action = 'suspendidas';
+    } catch (Exception $e) {
+        $error = 'Error al activar la empresa: ' . $e->getMessage();
+    }
+}
+
 // Procesar formulario de nueva empresa o edición
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit'])) {
     $data = [
@@ -148,8 +165,8 @@ if (in_array($action, ['new', 'edit'])) {
 }
 
 // Listar empresas con filtros
-if ($action === 'list') {
-    $where = ["e.activo = 1"];
+if ($action === 'list' || $action === 'suspendidas') {
+    $where = [$action === 'suspendidas' ? "e.activo = 0" : "e.activo = 1"];
     $params = [];
     
     // Aplicar filtros
@@ -208,12 +225,25 @@ include __DIR__ . '/app/views/layouts/header.php';
 <!-- Listado de empresas -->
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-800">Gestión de Empresas</h1>
-        <?php if (hasPermission('CAPTURISTA')): ?>
-        <a href="?action=new" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-            <i class="fas fa-plus mr-2"></i>Nueva Empresa
-        </a>
-        <?php endif; ?>
+        <h1 class="text-3xl font-bold text-gray-800">
+            <?php echo $action === 'suspendidas' ? 'Empresas Suspendidas' : 'Gestión de Empresas'; ?>
+        </h1>
+        <div class="flex space-x-2">
+            <?php if ($action === 'suspendidas'): ?>
+                <a href="?action=list" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Volver a Activas
+                </a>
+            <?php else: ?>
+                <a href="?action=suspendidas" class="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition">
+                    <i class="fas fa-ban mr-2"></i>Ver Suspendidas
+                </a>
+                <?php if (hasPermission('CAPTURISTA')): ?>
+                <a href="?action=new" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Nueva Empresa
+                </a>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php if ($success): ?>
@@ -295,6 +325,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                                title="Ver detalles">
                                 <i class="fas fa-eye"></i>
                             </a>
+                            <?php if ($action !== 'suspendidas'): ?>
                             <a href="?action=edit&id=<?php echo $empresa['id']; ?>" 
                                class="text-blue-600 hover:text-blue-800" 
                                title="Editar">
@@ -306,6 +337,14 @@ include __DIR__ . '/app/views/layouts/header.php';
                                onclick="return confirm('¿Está seguro de suspender esta empresa?')">
                                 <i class="fas fa-ban"></i>
                             </a>
+                            <?php else: ?>
+                            <a href="?action=activate&id=<?php echo $empresa['id']; ?>" 
+                               class="text-green-600 hover:text-green-800"
+                               title="Activar empresa"
+                               onclick="return confirm('¿Está seguro de activar esta empresa?')">
+                                <i class="fas fa-check-circle"></i>
+                            </a>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>
