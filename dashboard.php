@@ -289,22 +289,61 @@ include __DIR__ . '/app/views/layouts/header.php';
 
     <!-- Sección de Gráficas Analíticas -->
     <div class="mb-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">
-            <i class="fas fa-chart-line mr-2"></i>Análisis y Tendencias
-        </h2>
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h2 class="text-2xl font-bold text-gray-800">
+                <i class="fas fa-chart-line mr-2"></i>Análisis y Tendencias
+            </h2>
+            
+            <!-- Filtro de Fechas -->
+            <div class="bg-white rounded-lg shadow-md p-4 flex flex-col sm:flex-row gap-3 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+                    <input 
+                        type="date" 
+                        id="fecha_inicio" 
+                        class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                    <input 
+                        type="date" 
+                        id="fecha_fin" 
+                        class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                </div>
+                <button 
+                    id="btnFiltrarGraficas" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <button 
+                    id="btnResetFiltro" 
+                    class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                    title="Restablecer a mes actual"
+                >
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+        </div>
         
         <!-- Gráficas - Fila 1 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <!-- Gráfica 1: Empresas por Membresía -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Empresas por Membresía</h3>
-                <canvas id="chartMembresias" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartMembresias"></canvas>
+                </div>
             </div>
             
             <!-- Gráfica 2: Empresas por Sector -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Top 10 Sectores</h3>
-                <canvas id="chartSectores" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartSectores"></canvas>
+                </div>
             </div>
         </div>
         
@@ -313,13 +352,17 @@ include __DIR__ . '/app/views/layouts/header.php';
             <!-- Gráfica 3: Ingresos por Mes -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Ingresos Últimos 6 Meses</h3>
-                <canvas id="chartIngresos" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartIngresos"></canvas>
+                </div>
             </div>
             
             <!-- Gráfica 4: Nuevas Empresas por Mes -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Nuevas Afiliaciones (6 Meses)</h3>
-                <canvas id="chartNuevasEmpresas" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartNuevasEmpresas"></canvas>
+                </div>
             </div>
         </div>
         
@@ -328,13 +371,17 @@ include __DIR__ . '/app/views/layouts/header.php';
             <!-- Gráfica 5: Estado de Empresas -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Estado de Membresías</h3>
-                <canvas id="chartEstadoEmpresas" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartEstadoEmpresas"></canvas>
+                </div>
             </div>
             
             <!-- Gráfica 6: Eventos por Tipo -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Eventos por Tipo</h3>
-                <canvas id="chartEventos" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartEventos"></canvas>
+                </div>
             </div>
         </div>
         
@@ -343,13 +390,17 @@ include __DIR__ . '/app/views/layouts/header.php';
             <!-- Gráfica 7: Requerimientos por Estado -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Requerimientos por Estado</h3>
-                <canvas id="chartRequerimientos" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartRequerimientos"></canvas>
+                </div>
             </div>
             
             <!-- Gráfica 8: Empresas por Ciudad -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4">Top 10 Ciudades</h3>
-                <canvas id="chartCiudades" height="250"></canvas>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chartCiudades"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -458,7 +509,7 @@ const colorPalette = [
 
 // 1. Gráfica de Empresas por Membresía (Doughnut)
 <?php if (!empty($empresasPorMembresia)): ?>
-new Chart(document.getElementById('chartMembresias'), {
+chartInstances.chartMembresias = new Chart(document.getElementById('chartMembresias'), {
     type: 'doughnut',
     data: {
         labels: <?php echo json_encode(array_column($empresasPorMembresia, 'nombre')); ?>,
@@ -471,7 +522,7 @@ new Chart(document.getElementById('chartMembresias'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: {
                 position: 'right',
@@ -491,7 +542,7 @@ new Chart(document.getElementById('chartMembresias'), {
 
 // 2. Gráfica de Empresas por Sector (Bar horizontal)
 <?php if (!empty($empresasPorSector)): ?>
-new Chart(document.getElementById('chartSectores'), {
+chartInstances.chartSectores = new Chart(document.getElementById('chartSectores'), {
     type: 'bar',
     data: {
         labels: <?php echo json_encode(array_column($empresasPorSector, 'nombre')); ?>,
@@ -506,7 +557,7 @@ new Chart(document.getElementById('chartSectores'), {
     options: {
         indexAxis: 'y',
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -526,7 +577,7 @@ new Chart(document.getElementById('chartSectores'), {
 
 // 3. Gráfica de Ingresos por Mes (Line)
 <?php if (!empty($ingresosPorMes)): ?>
-new Chart(document.getElementById('chartIngresos'), {
+chartInstances.chartIngresos = new Chart(document.getElementById('chartIngresos'), {
     type: 'line',
     data: {
         labels: <?php echo json_encode(array_column($ingresosPorMes, 'mes_nombre')); ?>,
@@ -544,7 +595,7 @@ new Chart(document.getElementById('chartIngresos'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -571,7 +622,7 @@ new Chart(document.getElementById('chartIngresos'), {
 
 // 4. Gráfica de Nuevas Empresas por Mes (Bar)
 <?php if (!empty($nuevasEmpresasPorMes)): ?>
-new Chart(document.getElementById('chartNuevasEmpresas'), {
+chartInstances.chartNuevasEmpresas = new Chart(document.getElementById('chartNuevasEmpresas'), {
     type: 'bar',
     data: {
         labels: <?php echo json_encode(array_column($nuevasEmpresasPorMes, 'mes_nombre')); ?>,
@@ -585,7 +636,7 @@ new Chart(document.getElementById('chartNuevasEmpresas'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -604,7 +655,7 @@ new Chart(document.getElementById('chartNuevasEmpresas'), {
 <?php endif; ?>
 
 // 5. Gráfica de Estado de Empresas (Pie)
-new Chart(document.getElementById('chartEstadoEmpresas'), {
+chartInstances.chartEstadoEmpresas = new Chart(document.getElementById('chartEstadoEmpresas'), {
     type: 'pie',
     data: {
         labels: ['Activas', 'Próximas a Vencer', 'Vencidas'],
@@ -625,7 +676,7 @@ new Chart(document.getElementById('chartEstadoEmpresas'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: {
                 position: 'bottom',
@@ -646,7 +697,7 @@ new Chart(document.getElementById('chartEstadoEmpresas'), {
 
 // 6. Gráfica de Eventos por Tipo (Doughnut)
 <?php if (!empty($eventosPorTipo)): ?>
-new Chart(document.getElementById('chartEventos'), {
+chartInstances.chartEventos = new Chart(document.getElementById('chartEventos'), {
     type: 'doughnut',
     data: {
         labels: <?php echo json_encode(array_column($eventosPorTipo, 'tipo')); ?>,
@@ -659,7 +710,7 @@ new Chart(document.getElementById('chartEventos'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: {
                 position: 'bottom',
@@ -672,7 +723,7 @@ new Chart(document.getElementById('chartEventos'), {
 
 // 7. Gráfica de Requerimientos por Estado (Bar)
 <?php if (!empty($requerimientosPorEstado)): ?>
-new Chart(document.getElementById('chartRequerimientos'), {
+chartInstances.chartRequerimientos = new Chart(document.getElementById('chartRequerimientos'), {
     type: 'bar',
     data: {
         labels: <?php echo json_encode(array_column($requerimientosPorEstado, 'estado')); ?>,
@@ -690,7 +741,7 @@ new Chart(document.getElementById('chartRequerimientos'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false }
         },
@@ -703,7 +754,7 @@ new Chart(document.getElementById('chartRequerimientos'), {
 
 // 8. Gráfica de Empresas por Ciudad (Bar horizontal)
 <?php if (!empty($empresasPorCiudad)): ?>
-new Chart(document.getElementById('chartCiudades'), {
+chartInstances.chartCiudades = new Chart(document.getElementById('chartCiudades'), {
     type: 'bar',
     data: {
         labels: <?php echo json_encode(array_column($empresasPorCiudad, 'ciudad')); ?>,
@@ -718,7 +769,7 @@ new Chart(document.getElementById('chartCiudades'), {
     options: {
         indexAxis: 'y',
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false }
         },
@@ -728,6 +779,126 @@ new Chart(document.getElementById('chartCiudades'), {
     }
 });
 <?php endif; ?>
+
+// Almacenar referencias a los gráficos para poder actualizarlos
+let chartInstances = {};
+
+// Función para inicializar las fechas con el mes actual
+function initializeDateFilter() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    const fechaInicio = document.getElementById('fecha_inicio');
+    const fechaFin = document.getElementById('fecha_fin');
+    
+    if (fechaInicio && fechaFin) {
+        fechaInicio.value = firstDay.toISOString().split('T')[0];
+        fechaFin.value = lastDay.toISOString().split('T')[0];
+    }
+}
+
+// Función para actualizar las gráficas con datos filtrados
+async function actualizarGraficas() {
+    const fechaInicio = document.getElementById('fecha_inicio').value;
+    const fechaFin = document.getElementById('fecha_fin').value;
+    
+    if (!fechaInicio || !fechaFin) {
+        alert('Por favor selecciona ambas fechas');
+        return;
+    }
+    
+    try {
+        // Mostrar indicador de carga
+        document.body.style.cursor = 'wait';
+        
+        const response = await fetch(`<?php echo BASE_URL; ?>/api/dashboard_charts.php?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Error al obtener datos');
+        }
+        
+        const data = result.data;
+        
+        // Actualizar cada gráfica
+        if (chartInstances.chartMembresias && data.empresasPorMembresia.length > 0) {
+            chartInstances.chartMembresias.data.labels = data.empresasPorMembresia.map(item => item.nombre);
+            chartInstances.chartMembresias.data.datasets[0].data = data.empresasPorMembresia.map(item => parseInt(item.cantidad));
+            chartInstances.chartMembresias.update();
+        }
+        
+        if (chartInstances.chartSectores && data.empresasPorSector.length > 0) {
+            chartInstances.chartSectores.data.labels = data.empresasPorSector.map(item => item.nombre);
+            chartInstances.chartSectores.data.datasets[0].data = data.empresasPorSector.map(item => parseInt(item.cantidad));
+            chartInstances.chartSectores.update();
+        }
+        
+        if (chartInstances.chartIngresos && data.ingresosPorMes.length > 0) {
+            chartInstances.chartIngresos.data.labels = data.ingresosPorMes.map(item => item.mes_nombre);
+            chartInstances.chartIngresos.data.datasets[0].data = data.ingresosPorMes.map(item => parseFloat(item.total));
+            chartInstances.chartIngresos.update();
+        }
+        
+        if (chartInstances.chartNuevasEmpresas && data.nuevasEmpresasPorMes.length > 0) {
+            chartInstances.chartNuevasEmpresas.data.labels = data.nuevasEmpresasPorMes.map(item => item.mes_nombre);
+            chartInstances.chartNuevasEmpresas.data.datasets[0].data = data.nuevasEmpresasPorMes.map(item => parseInt(item.cantidad));
+            chartInstances.chartNuevasEmpresas.update();
+        }
+        
+        if (chartInstances.chartEstadoEmpresas) {
+            chartInstances.chartEstadoEmpresas.data.datasets[0].data = [
+                parseInt(data.empresasActivas || 0),
+                parseInt(data.empresasProximasVencer || 0),
+                parseInt(data.empresasVencidas || 0)
+            ];
+            chartInstances.chartEstadoEmpresas.update();
+        }
+        
+        if (chartInstances.chartEventos && data.eventosPorTipo.length > 0) {
+            chartInstances.chartEventos.data.labels = data.eventosPorTipo.map(item => item.tipo);
+            chartInstances.chartEventos.data.datasets[0].data = data.eventosPorTipo.map(item => parseInt(item.cantidad));
+            chartInstances.chartEventos.update();
+        }
+        
+        if (chartInstances.chartRequerimientos && data.requerimientosPorEstado.length > 0) {
+            chartInstances.chartRequerimientos.data.labels = data.requerimientosPorEstado.map(item => item.estado);
+            chartInstances.chartRequerimientos.data.datasets[0].data = data.requerimientosPorEstado.map(item => parseInt(item.cantidad));
+            chartInstances.chartRequerimientos.update();
+        }
+        
+        if (chartInstances.chartCiudades && data.empresasPorCiudad.length > 0) {
+            chartInstances.chartCiudades.data.labels = data.empresasPorCiudad.map(item => item.ciudad);
+            chartInstances.chartCiudades.data.datasets[0].data = data.empresasPorCiudad.map(item => parseInt(item.cantidad));
+            chartInstances.chartCiudades.update();
+        }
+        
+    } catch (error) {
+        console.error('Error al actualizar gráficas:', error);
+        alert('Error al actualizar las gráficas: ' + error.message);
+    } finally {
+        document.body.style.cursor = 'default';
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDateFilter();
+    
+    const btnFiltrar = document.getElementById('btnFiltrarGraficas');
+    const btnReset = document.getElementById('btnResetFiltro');
+    
+    if (btnFiltrar) {
+        btnFiltrar.addEventListener('click', actualizarGraficas);
+    }
+    
+    if (btnReset) {
+        btnReset.addEventListener('click', function() {
+            initializeDateFilter();
+            actualizarGraficas();
+        });
+    }
+});
 </script>
 <?php endif; ?>
 
