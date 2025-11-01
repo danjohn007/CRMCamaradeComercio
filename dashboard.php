@@ -510,6 +510,9 @@ const colorPalette = [
 // Almacenar referencias a los gráficos para poder actualizarlos
 let chartInstances = {};
 
+// Configuración base para API
+const BASE_API_URL = <?php echo json_encode(BASE_URL); ?>;
+
 // 1. Gráfica de Empresas por Membresía (Doughnut)
 <?php if (!empty($empresasPorMembresia)): ?>
 chartInstances.chartMembresias = new Chart(document.getElementById('chartMembresias'), {
@@ -812,7 +815,7 @@ async function actualizarGraficas() {
         // Mostrar indicador de carga
         document.body.style.cursor = 'wait';
         
-        const response = await fetch(`<?php echo BASE_URL; ?>/api/dashboard_charts.php?fecha_inicio=${encodeURIComponent(fechaInicio)}&fecha_fin=${encodeURIComponent(fechaFin)}`);
+        const response = await fetch(`${BASE_API_URL}/api/dashboard_charts.php?fecha_inicio=${encodeURIComponent(fechaInicio)}&fecha_fin=${encodeURIComponent(fechaFin)}`);
         const result = await response.json();
         
         if (!result.success) {

@@ -163,10 +163,12 @@ try {
     ]);
     
 } catch (Exception $e) {
+    // Log error for debugging
+    error_log('Dashboard Charts API Error: ' . $e->getMessage());
+    
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Error al obtener datos de gráficas',
-        'message' => $e->getMessage()
+        'error' => 'Error al obtener datos de gráficas. Por favor, intente nuevamente.'
     ]);
 }
