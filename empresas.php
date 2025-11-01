@@ -331,6 +331,11 @@ include __DIR__ . '/app/views/layouts/header.php';
                                title="Editar">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            <button onclick="abrirModalPago(<?php echo $empresa['id']; ?>, '<?php echo addslashes($empresa['razon_social']); ?>')" 
+                               class="text-purple-600 hover:text-purple-800"
+                               title="Registrar pago">
+                                <i class="fas fa-dollar-sign"></i>
+                            </button>
                             <a href="?action=suspend&id=<?php echo $empresa['id']; ?>" 
                                class="text-orange-600 hover:text-orange-800"
                                title="Suspender empresa"
@@ -787,5 +792,164 @@ if (!$empresa) {
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Modal para Registrar Pago -->
+<div id="modalPago" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-lg bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-800">Registrar Pago</h3>
+            <button onclick="cerrarModalPago()" class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <form id="formPago" enctype="multipart/form-data" onsubmit="return submitPago(event)">
+            <input type="hidden" id="empresa_id" name="empresa_id">
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 font-semibold mb-2">Empresa</label>
+                <input type="text" id="empresa_nombre" class="w-full px-4 py-2 border rounded-lg bg-gray-100" readonly>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 font-semibold mb-2">Concepto *</label>
+                <input type="text" name="concepto" required 
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                       placeholder="Ej: Pago de Membresía 2024">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Monto * ($)</label>
+                    <input type="number" name="monto" step="0.01" min="0.01" required 
+                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                           placeholder="0.00">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Método de Pago *</label>
+                    <select name="metodo_pago" required 
+                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        <option value="EFECTIVO">Efectivo</option>
+                        <option value="TRANSFERENCIA">Transferencia</option>
+                        <option value="TARJETA">Tarjeta</option>
+                        <option value="PAYPAL">PayPal</option>
+                        <option value="OTRO">Otro</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Referencia</label>
+                    <input type="text" name="referencia" 
+                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                           placeholder="Número de referencia o folio">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Fecha de Pago *</label>
+                    <input type="datetime-local" name="fecha_pago" required 
+                           value="<?php echo date('Y-m-d\TH:i'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 font-semibold mb-2">Evidencia de Pago</label>
+                <input type="file" name="evidencia" accept=".jpg,.jpeg,.png,.pdf" 
+                       class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                <p class="text-sm text-gray-500 mt-1">Formatos permitidos: JPG, PNG, PDF (máx. 5MB)</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-700 font-semibold mb-2">Notas</label>
+                <textarea name="notas" rows="3" 
+                          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                          placeholder="Observaciones adicionales"></textarea>
+            </div>
+            
+            <div id="pagoError" class="hidden bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                <p class="text-red-700"></p>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="cerrarModalPago()" 
+                        class="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition">
+                    Cancelar
+                </button>
+                <button type="submit" id="btnGuardarPago"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Registrar Pago
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalPago(empresaId, empresaNombre) {
+    document.getElementById('empresa_id').value = empresaId;
+    document.getElementById('empresa_nombre').value = empresaNombre;
+    document.getElementById('formPago').reset();
+    document.getElementById('empresa_id').value = empresaId;
+    document.getElementById('empresa_nombre').value = empresaNombre;
+    document.getElementById('pagoError').classList.add('hidden');
+    document.getElementById('modalPago').classList.remove('hidden');
+}
+
+function cerrarModalPago() {
+    document.getElementById('modalPago').classList.add('hidden');
+    document.getElementById('formPago').reset();
+}
+
+async function submitPago(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const btnGuardar = document.getElementById('btnGuardarPago');
+    const errorDiv = document.getElementById('pagoError');
+    
+    // Deshabilitar botón
+    btnGuardar.disabled = true;
+    btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Guardando...';
+    errorDiv.classList.add('hidden');
+    
+    try {
+        const response = await fetch('<?php echo BASE_URL; ?>/api/registrar_pago.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Mostrar mensaje de éxito
+            alert('Pago registrado exitosamente');
+            cerrarModalPago();
+            // Recargar página para ver el cambio
+            window.location.reload();
+        } else {
+            throw new Error(result.error || 'Error al registrar el pago');
+        }
+    } catch (error) {
+        errorDiv.querySelector('p').textContent = error.message;
+        errorDiv.classList.remove('hidden');
+    } finally {
+        btnGuardar.disabled = false;
+        btnGuardar.innerHTML = '<i class="fas fa-save mr-2"></i>Registrar Pago';
+    }
+    
+    return false;
+}
+
+// Cerrar modal al hacer clic fuera de él
+document.getElementById('modalPago').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalPago();
+    }
+});
+</script>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>

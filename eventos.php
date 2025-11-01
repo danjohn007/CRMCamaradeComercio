@@ -463,6 +463,16 @@ include __DIR__ . '/app/views/layouts/header.php';
                 </div>
                 <?php endif; ?>
 
+                <!-- Ver participantes (solo para administradores) -->
+                <?php if (hasPermission('DIRECCION') && $evento['inscritos'] > 0): ?>
+                <div class="mb-6">
+                    <button onclick="verParticipantes(<?php echo $evento['id']; ?>)" 
+                            class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                        <i class="fas fa-users mr-2"></i>Ver Participantes (<?php echo $evento['inscritos']; ?>)
+                    </button>
+                </div>
+                <?php endif; ?>
+
                 <!-- Botón de inscripción -->
                 <?php if ($evento['requiere_inscripcion'] && !$yaInscrito): ?>
                     <?php 
@@ -618,5 +628,155 @@ include __DIR__ . '/app/views/layouts/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Modal para Ver Participantes -->
+<div id="modalParticipantes" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-lg bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-800">Participantes del Evento</h3>
+            <button onclick="cerrarModalParticipantes()" class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <div id="participantesContenido" class="mb-4">
+            <!-- Se llenará con JavaScript -->
+        </div>
+        
+        <div class="flex justify-end">
+            <button onclick="cerrarModalParticipantes()" 
+                    class="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition">
+                Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function verParticipantes(eventoId) {
+    const modal = document.getElementById('modalParticipantes');
+    const contenido = document.getElementById('participantesContenido');
+    
+    // Mostrar loader
+    contenido.innerHTML = `
+        <div class="flex justify-center items-center py-8">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('<?php echo BASE_URL; ?>/api/evento_participantes.php?evento_id=' + eventoId);
+        const data = await response.json();
+        
+        if (data.success) {
+            let html = '';
+            
+            if (data.participantes.length === 0) {
+                html = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-users text-4xl mb-3"></i>
+                        <p>No hay participantes inscritos aún</p>
+                    </div>
+                `;
+            } else {
+                html = `
+                    <div class="mb-4 text-gray-600">
+                        <strong>${data.participantes.length}</strong> participante(s) inscrito(s)
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Inscripción</th>
+                                    ${data.tiene_costo ? '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado Pago</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                `;
+                
+                data.participantes.forEach(p => {
+                    html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm text-gray-800">${p.nombre}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600">${p.email || '-'}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600">${p.empresa || '-'}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600">${formatFecha(p.fecha_inscripcion)}</td>
+                    `;
+                    
+                    if (data.tiene_costo) {
+                        let estadoClass = 'bg-gray-100 text-gray-800';
+                        let estadoTexto = p.estado_pago;
+                        
+                        if (p.estado_pago === 'COMPLETADO') {
+                            estadoClass = 'bg-green-100 text-green-800';
+                            estadoTexto = 'Pagado';
+                        } else if (p.estado_pago === 'PENDIENTE') {
+                            estadoClass = 'bg-yellow-100 text-yellow-800';
+                            estadoTexto = 'Pendiente';
+                        } else if (p.estado_pago === 'CANCELADO') {
+                            estadoClass = 'bg-red-100 text-red-800';
+                            estadoTexto = 'Cancelado';
+                        }
+                        
+                        html += `
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 text-xs rounded-full font-semibold ${estadoClass}">
+                                    ${estadoTexto}
+                                </span>
+                                ${p.monto_pagado > 0 ? '<br><span class="text-xs text-gray-500">$' + parseFloat(p.monto_pagado).toFixed(2) + '</span>' : ''}
+                            </td>
+                        `;
+                    }
+                    
+                    html += '</tr>';
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            contenido.innerHTML = html;
+        } else {
+            throw new Error(data.error || 'Error al cargar participantes');
+        }
+    } catch (error) {
+        contenido.innerHTML = `
+            <div class="bg-red-50 border-l-4 border-red-500 p-4">
+                <p class="text-red-700">${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function cerrarModalParticipantes() {
+    document.getElementById('modalParticipantes').classList.add('hidden');
+}
+
+function formatFecha(fecha) {
+    if (!fecha) return '-';
+    const d = new Date(fecha);
+    return d.toLocaleDateString('es-MX', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalParticipantes')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModalParticipantes();
+    }
+});
+</script>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>
