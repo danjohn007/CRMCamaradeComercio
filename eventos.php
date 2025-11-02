@@ -298,7 +298,7 @@ include __DIR__ . '/app/views/layouts/header.php';
 
     <?php if ($success): ?>
         <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6">
-            <p class="text-green-700"><?php echo e($success); ?></p>
+            <p class="text-green-700"><?php echo $success; /* Contains safe HTML link */ ?></p>
         </div>
     <?php endif; ?>
 
@@ -421,7 +421,7 @@ include __DIR__ . '/app/views/layouts/header.php';
 
         <?php if ($success): ?>
             <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6">
-                <p class="text-green-700"><?php echo e($success); ?></p>
+                <p class="text-green-700"><?php echo $success; /* Contains safe HTML link */ ?></p>
             </div>
         <?php endif; ?>
 

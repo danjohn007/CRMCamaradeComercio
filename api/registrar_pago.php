@@ -78,15 +78,17 @@ try {
         throw new Exception('Empresa no encontrada');
     }
     
-    // Procesar evidencia si se subió
+    // Procesar evidencia (obligatoria)
     $evidencia_pago = null;
-    if (isset($_FILES['evidencia']) && $_FILES['evidencia']['error'] === UPLOAD_ERR_OK) {
-        $result = uploadFile($_FILES['evidencia'], ['jpg', 'jpeg', 'png', 'pdf'], MAX_FILE_SIZE);
-        if ($result['success']) {
-            $evidencia_pago = $result['filename'];
-        } else {
-            throw new Exception('Error al subir evidencia: ' . $result['message']);
-        }
+    if (!isset($_FILES['evidencia']) || $_FILES['evidencia']['error'] !== UPLOAD_ERR_OK) {
+        throw new Exception('La evidencia de pago es obligatoria');
+    }
+    
+    $result = uploadFile($_FILES['evidencia'], ['jpg', 'jpeg', 'png', 'pdf'], MAX_FILE_SIZE);
+    if ($result['success']) {
+        $evidencia_pago = $result['filename'];
+    } else {
+        throw new Exception('Error al subir evidencia: ' . $result['message']);
     }
     
     // Insertar pago
@@ -108,6 +110,46 @@ try {
     ]);
     
     $pago_id = $db->lastInsertId();
+    
+    // Registrar en finanzas_movimientos (para reflejar en Dashboard Financiero)
+    try {
+        // Obtener o crear categoría de "Pago de Membresías"
+        $stmt = $db->prepare("SELECT id FROM finanzas_categorias WHERE nombre = 'Pago de Membresías' AND tipo = 'INGRESO' LIMIT 1");
+        $stmt->execute();
+        $categoria = $stmt->fetch();
+        
+        if (!$categoria) {
+            // Crear categoría si no existe
+            $stmt = $db->prepare("INSERT INTO finanzas_categorias (nombre, tipo, descripcion, color, activo) VALUES (?, 'INGRESO', 'Pagos de membresías de empresas', '#10B981', 1)");
+            $stmt->execute(['Pago de Membresías']);
+            $categoria_id = $db->lastInsertId();
+        } else {
+            $categoria_id = $categoria['id'];
+        }
+        
+        // Insertar movimiento financiero
+        $stmt = $db->prepare("
+            INSERT INTO finanzas_movimientos 
+            (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, notas) 
+            VALUES (?, 'INGRESO', ?, 'Generado automáticamente desde Registrar Pago', ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $categoria_id,
+            $concepto,
+            $monto,
+            $fecha_pago,
+            $metodo_pago,
+            $referencia,
+            $empresa_id,
+            $user['id'],
+            'PAGO_ID:' . $pago_id . ($notas ? ' - ' . $notas : '')
+        ]);
+    } catch (Exception $e) {
+        // Log error with full context but don't fail the payment registration
+        error_log("CRITICAL: Error al crear movimiento financiero - Usuario ID: {$user['id']}, Pago ID: {$pago_id}, Empresa ID: {$empresa_id}, Error: " . $e->getMessage());
+        // Optionally notify admin - uncomment if notification system is available
+        // notifyAdmin("Error crítico en sincronización financiera", "Error al crear movimiento para pago #{$pago_id}");
+    }
     
     // Registrar en auditoría
     $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, datos_nuevos) 

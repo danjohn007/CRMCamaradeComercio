@@ -208,9 +208,14 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </option>
                 <?php endforeach; ?>
             </select>
-            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                <i class="fas fa-filter mr-2"></i>Filtrar
-            </button>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-filter mr-2"></i>Filtrar
+                </button>
+                <a href="requerimientos.php" class="flex-1 bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 text-center">
+                    <i class="fas fa-times mr-2"></i>Limpiar
+                </a>
+            </div>
         </form>
     </div>
 

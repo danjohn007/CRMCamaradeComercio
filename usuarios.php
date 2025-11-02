@@ -190,9 +190,14 @@ include 'app/views/layouts/header.php';
                     <option value="0" <?= (($_GET['activo'] ?? '') === '0') ? 'selected' : '' ?>>Inactivos</option>
                 </select>
 
-                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                    Filtrar
-                </button>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        Filtrar
+                    </button>
+                    <a href="usuarios.php" class="flex-1 bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 text-center">
+                        <i class="fas fa-times mr-2"></i>Limpiar
+                    </a>
+                </div>
             </form>
         </div>
 
