@@ -265,6 +265,14 @@ $user = getCurrentUser();
                     </div>
                     <?php endif; ?>
 
+                    <!-- Auditoría -->
+                    <?php if (hasPermission('PRESIDENCIA')): ?>
+                    <a href="<?php echo BASE_URL; ?>/auditoria.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
+                        <i class="fas fa-shield-alt w-5"></i>
+                        <span>Auditoría</span>
+                    </a>
+                    <?php endif; ?>
+                    
                     <!-- Configuración -->
                     <?php if (hasPermission('PRESIDENCIA')): ?>
                     <a href="<?php echo BASE_URL; ?>/configuracion.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
