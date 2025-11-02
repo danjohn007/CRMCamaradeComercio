@@ -74,7 +74,7 @@ BEGIN
             NEW.referencia,
             NEW.empresa_id,
             NEW.usuario_id,
-            CONCAT('Pago ID: ', NEW.id, IFNULL(CONCAT(' - ', NEW.notas), '')),
+            CONCAT('PAGO_ID:', NEW.id, IFNULL(CONCAT(' - ', NEW.notas), '')),
             NOW()
         );
     END IF;
@@ -88,6 +88,7 @@ DELIMITER ;
 SELECT 'Sincronizando pagos existentes con movimientos financieros...' AS paso;
 
 -- Insertar movimientos financieros para pagos completados que no tienen movimiento asociado
+-- Usando una verificación más eficiente: buscamos coincidencias exactas en múltiples campos
 INSERT INTO finanzas_movimientos 
 (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, 
  referencia, empresa_id, usuario_id, notas, created_at)
@@ -102,13 +103,16 @@ SELECT
     p.referencia,
     p.empresa_id,
     p.usuario_id,
-    CONCAT('Pago ID: ', p.id, IFNULL(CONCAT(' - ', p.notas), '')) AS notas,
+    CONCAT('PAGO_ID:', p.id, IFNULL(CONCAT(' - ', p.notas), '')) AS notas,
     p.created_at
 FROM pagos p
 WHERE p.estado = 'COMPLETADO'
 AND NOT EXISTS (
     SELECT 1 FROM finanzas_movimientos fm 
-    WHERE fm.notas LIKE CONCAT('%Pago ID: ', p.id, '%')
+    WHERE fm.empresa_id = p.empresa_id
+    AND fm.monto = p.monto
+    AND fm.fecha_movimiento = p.fecha_pago
+    AND fm.notas LIKE CONCAT('PAGO_ID:', p.id, '%')
 );
 
 -- ========================================================================

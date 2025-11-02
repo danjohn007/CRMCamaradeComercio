@@ -142,11 +142,13 @@ try {
             $referencia,
             $empresa_id,
             $user['id'],
-            'Pago ID: ' . $pago_id . ($notas ? ' - ' . $notas : '')
+            'PAGO_ID:' . $pago_id . ($notas ? ' - ' . $notas : '')
         ]);
     } catch (Exception $e) {
-        // Log error but don't fail the payment registration
-        error_log("Error al crear movimiento financiero: " . $e->getMessage());
+        // Log error with full context but don't fail the payment registration
+        error_log("CRITICAL: Error al crear movimiento financiero - Usuario ID: {$user['id']}, Pago ID: {$pago_id}, Empresa ID: {$empresa_id}, Error: " . $e->getMessage());
+        // Optionally notify admin - uncomment if notification system is available
+        // notifyAdmin("Error crítico en sincronización financiera", "Error al crear movimiento para pago #{$pago_id}");
     }
     
     // Registrar en auditoría

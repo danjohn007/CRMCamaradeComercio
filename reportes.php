@@ -254,7 +254,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                     Generar Reporte
                 </button>
-                <a href="?tipo=ingresos" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 text-center">
+                <a href="reportes.php?tipo=<?php echo $tipo; ?>" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 text-center">
                     <i class="fas fa-times mr-2"></i>Limpiar
                 </a>
             </div>
