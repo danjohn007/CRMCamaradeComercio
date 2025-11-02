@@ -72,6 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'smtp_pass' => sanitize($_POST['smtp_pass'] ?? ''),
             'smtp_secure' => sanitize($_POST['smtp_secure'] ?? 'tls'),
             'smtp_from_name' => sanitize($_POST['smtp_from_name'] ?? ''),
+            // QR Code API Configuration
+            'qr_api_provider' => sanitize($_POST['qr_api_provider'] ?? 'google'),
+            'qr_size' => intval($_POST['qr_size'] ?? 400),
             // Shelly Relay API
             'shelly_api_enabled' => isset($_POST['shelly_api_enabled']) ? '1' : '0',
             'shelly_api_url' => sanitize($_POST['shelly_api_url'] ?? ''),
@@ -329,6 +332,42 @@ include __DIR__ . '/app/views/layouts/header.php';
                     <i class="fas fa-info-circle mr-2"></i>
                     <strong>Nota:</strong> Los colores personalizados se aplicarán mediante CSS en el sistema. 
                     Guarda la configuración para ver los cambios.
+                </p>
+            </div>
+        </div>
+
+        <!-- QR Code API Configuration -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-qrcode mr-2"></i>Configuración de Códigos QR
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">API para Generación de QR</label>
+                    <select name="qr_api_provider" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="google" <?php echo ($config['qr_api_provider'] ?? 'google') === 'google' ? 'selected' : ''; ?>>Google Charts API (por defecto)</option>
+                        <option value="qrserver" <?php echo ($config['qr_api_provider'] ?? '') === 'qrserver' ? 'selected' : ''; ?>>QR Server API</option>
+                        <option value="quickchart" <?php echo ($config['qr_api_provider'] ?? '') === 'quickchart' ? 'selected' : ''; ?>>QuickChart API</option>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">Seleccione el proveedor de API para generar códigos QR</p>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Tamaño de QR (píxeles)</label>
+                    <input type="number" name="qr_size" min="200" max="1000" step="50"
+                           value="<?php echo e($config['qr_size'] ?? '400'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="400">
+                    <p class="text-sm text-gray-500 mt-1">Tamaño del código QR para impresión (recomendado: 400px)</p>
+                </div>
+            </div>
+
+            <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>Nota:</strong> La configuración de API de QR permite cambiar el proveedor de generación de códigos QR.
+                    Un tamaño mayor mejora la calidad de impresión.
                 </p>
             </div>
         </div>

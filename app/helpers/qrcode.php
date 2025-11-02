@@ -14,14 +14,37 @@ class QRCodeGenerator {
     }
     
     /**
-     * Generar imagen QR usando API de Google Charts
+     * Generar imagen QR usando API configurada
      * @param string $data - Datos a codificar en el QR
      * @param int $size - Tamaño de la imagen
      * @return string - URL de la imagen QR
      */
     public static function generateQRImageURL($data, $size = 300) {
+        $config = getConfiguracion();
+        $provider = $config['qr_api_provider'] ?? 'google';
+        $configuredSize = intval($config['qr_size'] ?? 400);
+        
+        // Use configured size if provided size is default
+        if ($size == 300) {
+            $size = $configuredSize;
+        }
+        
         $data = urlencode($data);
-        return "https://chart.googleapis.com/chart?cht=qr&chs={$size}x{$size}&chl={$data}&choe=UTF-8";
+        
+        switch ($provider) {
+            case 'qrserver':
+                // QR Server API - más robusto para impresión
+                return "https://api.qrserver.com/v1/create-qr-code/?size={$size}x{$size}&data={$data}";
+            
+            case 'quickchart':
+                // QuickChart API - alternativa moderna
+                return "https://quickchart.io/qr?text={$data}&size={$size}";
+            
+            case 'google':
+            default:
+                // Google Charts API (por defecto)
+                return "https://chart.googleapis.com/chart?cht=qr&chs={$size}x{$size}&chl={$data}&choe=UTF-8";
+        }
     }
     
     /**

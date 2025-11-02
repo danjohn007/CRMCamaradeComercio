@@ -45,7 +45,17 @@ if (empty($codigo)) {
         @media print {
             .no-print { display: none !important; }
             body { background: white; }
-            .ticket-container { box-shadow: none; border: 2px solid #1E40AF; }
+            .ticket-container { box-shadow: none; border: 2px solid #1E40AF; page-break-inside: avoid; }
+            .qr-code-container img { 
+                width: 200px !important; 
+                height: 200px !important;
+                display: block !important;
+                margin: 0 auto !important;
+            }
+        }
+        .qr-code-container img {
+            max-width: 200px;
+            max-height: 200px;
         }
     </style>
 </head>
@@ -146,10 +156,12 @@ if (empty($codigo)) {
                     <p class="text-2xl font-bold text-blue-600 mb-4 tracking-wider"><?php echo e($inscripcion['codigo_qr']); ?></p>
                     
                     <?php if ($inscripcion['codigo_qr']): ?>
-                    <div class="inline-block p-4 bg-white border-4 border-blue-600 rounded">
-                        <img src="<?php echo QRCodeGenerator::generateQRImageURL(BASE_URL . '/boleto_digital.php?codigo=' . $inscripcion['codigo_qr']); ?>" 
+                    <div class="qr-code-container inline-block p-4 bg-white border-4 border-blue-600 rounded">
+                        <img src="<?php echo QRCodeGenerator::generateQRImageURL(BASE_URL . '/boleto_digital.php?codigo=' . $inscripcion['codigo_qr'], 400); ?>" 
                              alt="Código QR" 
-                             class="w-48 h-48 mx-auto">
+                             crossorigin="anonymous"
+                             class="w-48 h-48 mx-auto"
+                             style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
                     </div>
                     <?php endif; ?>
                     
