@@ -4,7 +4,26 @@
 -- Descripción: Mejoras al sistema según requerimientos
 -- =====================================================
 
-USE crm_camara_comercio;
+-- USE crm_camara_comercio;
+
+SET @dbname = DATABASE();
+SET @table = 'auditoria';
+SET @column = 'detalles';
+
+SET @sql = (
+  SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE table_schema = @dbname
+       AND table_name = @table
+       AND column_name = @column) > 0,
+    'SELECT \"La columna detalles ya existe\"',
+    CONCAT('ALTER TABLE `', @table, '` ADD COLUMN `', @column, '` TEXT NULL AFTER `registro_id`')
+  )
+);
+
+PREPARE alterIfNotExists FROM @sql;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
 -- =====================================================
 -- 1. MÓDULO FINANCIERO
