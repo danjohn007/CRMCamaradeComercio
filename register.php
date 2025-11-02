@@ -95,19 +95,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro - <?php echo APP_NAME; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php
+    // Cargar colores personalizados y configuraciones
+    try {
+        $db_config = Database::getInstance()->getConnection();
+        $stmt = $db_config->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario', 'logo_sistema', 'nombre_sitio', 'terminos_condiciones', 'politica_privacidad')");
+        $custom_config = [];
+        while ($row = $stmt->fetch()) {
+            $custom_config[$row['clave']] = $row['valor'];
+        }
+        $color_primario = $custom_config['color_primario'] ?? '#10B981';
+        $color_secundario = $custom_config['color_secundario'] ?? '#059669';
+        $logo_sistema = $custom_config['logo_sistema'] ?? '';
+        $nombre_sitio = $custom_config['nombre_sitio'] ?? APP_NAME;
+        $terminos_condiciones = $custom_config['terminos_condiciones'] ?? '';
+        $politica_privacidad = $custom_config['politica_privacidad'] ?? '';
+    } catch (Exception $e) {
+        $color_primario = '#10B981';
+        $color_secundario = '#059669';
+        $logo_sistema = '';
+        $nombre_sitio = APP_NAME;
+        $terminos_condiciones = '';
+        $politica_privacidad = '';
+    }
+    ?>
+    <style>
+        :root {
+            --color-primario: <?php echo $color_primario; ?>;
+            --color-secundario: <?php echo $color_secundario; ?>;
+        }
+        .bg-green-600, .bg-green-500 {
+            background-color: var(--color-primario) !important;
+        }
+        .text-green-600 {
+            color: var(--color-primario) !important;
+        }
+        .hover\:bg-green-700:hover {
+            background-color: var(--color-primario) !important;
+            filter: brightness(0.9);
+        }
+        .focus\:ring-green-500:focus {
+            --tw-ring-color: var(--color-primario) !important;
+        }
+        body {
+            background: linear-gradient(135deg, <?php echo $color_primario; ?>15 0%, <?php echo $color_secundario; ?>15 100%);
+        }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-green-50 to-green-100 min-h-screen py-8">
+<body class="min-h-screen py-8">
     <div class="container mx-auto px-4">
         <div class="max-w-2xl mx-auto">
             <!-- Encabezado -->
             <div class="text-center mb-8">
-                <div class="inline-block bg-green-600 text-white rounded-full p-4 mb-4">
-                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                    </svg>
-                </div>
+                <?php if (!empty($logo_sistema) && file_exists(ROOT_PATH . $logo_sistema)): ?>
+                    <div class="mb-4">
+                        <img src="<?php echo BASE_URL . $logo_sistema; ?>" alt="Logo" class="mx-auto max-h-24">
+                    </div>
+                <?php else: ?>
+                    <div class="inline-block bg-green-600 text-white rounded-full p-4 mb-4">
+                        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                        </svg>
+                    </div>
+                <?php endif; ?>
                 <h1 class="text-3xl font-bold text-gray-800">Registro de Empresa</h1>
-                <p class="text-gray-600 mt-2">Únete a la Cámara de Comercio de Querétaro</p>
+                <p class="text-gray-600 mt-2">Únete a <?php echo e($nombre_sitio); ?></p>
             </div>
 
             <!-- Formulario de Registro -->
@@ -235,9 +287,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 >
                                 <span class="ml-3 text-sm text-gray-600">
                                     Acepto los 
-                                    <a href="#" class="text-green-600 hover:underline">términos y condiciones</a> 
+                                    <?php if (!empty($terminos_condiciones)): ?>
+                                        <a href="<?php echo BASE_URL; ?>/terminos.php" target="_blank" class="text-green-600 hover:underline">términos y condiciones</a>
+                                    <?php else: ?>
+                                        <span class="text-green-600">términos y condiciones</span>
+                                    <?php endif; ?>
                                     y la 
-                                    <a href="#" class="text-green-600 hover:underline">política de privacidad</a>
+                                    <?php if (!empty($politica_privacidad)): ?>
+                                        <a href="<?php echo BASE_URL; ?>/privacidad.php" target="_blank" class="text-green-600 hover:underline">política de privacidad</a>
+                                    <?php else: ?>
+                                        <span class="text-green-600">política de privacidad</span>
+                                    <?php endif; ?>
                                 </span>
                             </label>
                         </div>
@@ -263,6 +323,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </a>
                     </p>
                 </div>
+            </div>
+            
+            <!-- Footer con términos -->
+            <div class="mt-6 text-center text-xs text-gray-600">
+                <?php if (!empty($terminos_condiciones) || !empty($politica_privacidad)): ?>
+                    <div class="flex justify-center space-x-4">
+                        <?php if (!empty($terminos_condiciones)): ?>
+                            <a href="<?php echo BASE_URL; ?>/terminos.php" target="_blank" class="hover:underline">
+                                Términos y Condiciones
+                            </a>
+                        <?php endif; ?>
+                        <?php if (!empty($politica_privacidad)): ?>
+                            <a href="<?php echo BASE_URL; ?>/privacidad.php" target="_blank" class="hover:underline">
+                                Política de Privacidad
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

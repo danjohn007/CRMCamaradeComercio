@@ -386,21 +386,37 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
         <?php endif; ?>
 
-        <form method="POST" class="bg-white rounded-lg shadow-md p-8">
+        <form method="POST" class="bg-white rounded-lg shadow-md p-8" id="formEmpresa">
+            <?php if ($action === 'new'): ?>
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                <p class="text-sm text-blue-700">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>Tip:</strong> Ingresa el RFC primero. Si la empresa ya existe en el sistema, 
+                    los datos se cargarán automáticamente y podrás editarlos.
+                </p>
+            </div>
+            <?php endif; ?>
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- RFC - Primer campo -->
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">RFC *</label>
+                    <input type="text" name="rfc" id="rfc_input" required maxlength="13"
+                           value="<?php echo e($empresa['rfc'] ?? ''); ?>"
+                           <?php echo $action === 'edit' ? 'readonly' : ''; ?>
+                           oninput="this.value = this.value.toUpperCase(); <?php echo $action === 'new' ? 'buscarEmpresaExistente(this.value);' : ''; ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 <?php echo $action === 'edit' ? 'bg-gray-100' : ''; ?>">
+                    <?php if ($action === 'edit'): ?>
+                        <p class="text-xs text-gray-500 mt-1">El RFC no puede ser modificado</p>
+                    <?php endif; ?>
+                    <div id="rfc_result" class="mt-2"></div>
+                </div>
+                
                 <!-- Razón Social -->
                 <div class="md:col-span-2">
                     <label class="block text-gray-700 font-semibold mb-2">Razón Social *</label>
-                    <input type="text" name="razon_social" required
+                    <input type="text" name="razon_social" id="razon_social" required
                            value="<?php echo e($empresa['razon_social'] ?? ''); ?>"
-                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                </div>
-
-                <!-- RFC -->
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">RFC *</label>
-                    <input type="text" name="rfc" required maxlength="13"
-                           value="<?php echo e($empresa['rfc'] ?? ''); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
 
@@ -972,6 +988,76 @@ document.getElementById('modalPago').addEventListener('click', function(e) {
         cerrarModalPago();
     }
 });
+
+// Función para buscar empresa existente por RFC al registrar nueva empresa
+let buscarRFCTimeout;
+async function buscarEmpresaExistente(rfc) {
+    clearTimeout(buscarRFCTimeout);
+    const resultDiv = document.getElementById('rfc_result');
+    
+    // Limpiar campos si RFC es muy corto
+    if (rfc.length < 12) {
+        resultDiv.innerHTML = '';
+        return;
+    }
+    
+    buscarRFCTimeout = setTimeout(async () => {
+        try {
+            const response = await fetch('<?php echo BASE_URL; ?>/api/buscar_empresa.php?rfc=' + encodeURIComponent(rfc));
+            const data = await response.json();
+            
+            if (data.success && data.empresa) {
+                const emp = data.empresa;
+                
+                // Mostrar mensaje
+                resultDiv.innerHTML = `
+                    <div class="p-4 bg-green-50 border-l-4 border-green-500 rounded">
+                        <p class="text-sm text-green-700 font-semibold mb-2">
+                            <i class="fas fa-check-circle mr-2"></i>Empresa encontrada en el sistema. Datos cargados automáticamente.
+                        </p>
+                        <p class="text-xs text-gray-600">Puedes editar la información según sea necesario.</p>
+                    </div>
+                `;
+                
+                // Llenar campos automáticamente
+                document.getElementById('razon_social').value = emp.razon_social || '';
+                document.querySelector('input[name="email"]').value = emp.email || '';
+                document.querySelector('input[name="telefono"]').value = emp.telefono || '';
+                document.querySelector('input[name="whatsapp"]').value = emp.whatsapp || '';
+                
+                // Los demás campos también se pueden llenar si están disponibles
+                if (emp.direccion_comercial) {
+                    const direccionField = document.querySelector('textarea[name="direccion_comercial"]');
+                    if (direccionField) direccionField.value = emp.direccion_comercial;
+                }
+                
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                        <p class="text-sm text-blue-700">
+                            <i class="fas fa-info-circle mr-2"></i>RFC no encontrado. Puedes registrar una nueva empresa.
+                        </p>
+                    </div>
+                `;
+                
+                // Limpiar campos
+                document.getElementById('razon_social').value = '';
+                document.querySelector('input[name="email"]').value = '';
+                document.querySelector('input[name="telefono"]').value = '';
+                document.querySelector('input[name="whatsapp"]').value = '';
+            }
+        } catch (error) {
+            console.error('Error al buscar empresa:', error);
+            resultDiv.innerHTML = `
+                <div class="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                    <p class="text-sm text-yellow-700">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>Error al buscar empresa. Puedes continuar con el registro.
+                    </p>
+                </div>
+            `;
+        }
+    }, 500);
+}
 </script>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>

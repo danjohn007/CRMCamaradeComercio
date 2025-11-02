@@ -133,12 +133,34 @@ if (isset($_GET['success'])) {
         <div class="max-w-md mx-auto">
             <!-- Logo y Título -->
             <div class="text-center mb-8">
-                <div class="inline-block bg-blue-600 text-white rounded-full p-4 mb-4">
-                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                    </svg>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-800"><?php echo APP_NAME; ?></h1>
+                <?php
+                // Obtener logo del sistema desde configuración
+                $logo_sistema = '';
+                $nombre_sitio = APP_NAME;
+                try {
+                    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('logo_sistema', 'nombre_sitio')");
+                    while ($row = $stmt->fetch()) {
+                        if ($row['clave'] === 'logo_sistema') {
+                            $logo_sistema = $row['valor'];
+                        } elseif ($row['clave'] === 'nombre_sitio' && !empty($row['valor'])) {
+                            $nombre_sitio = $row['valor'];
+                        }
+                    }
+                } catch (Exception $e) {}
+                
+                if (!empty($logo_sistema) && file_exists(ROOT_PATH . $logo_sistema)):
+                ?>
+                    <div class="mb-4">
+                        <img src="<?php echo BASE_URL . $logo_sistema; ?>" alt="Logo" class="mx-auto max-h-24">
+                    </div>
+                <?php else: ?>
+                    <div class="inline-block bg-blue-600 text-white rounded-full p-4 mb-4">
+                        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                    </div>
+                <?php endif; ?>
+                <h1 class="text-3xl font-bold text-gray-800"><?php echo e($nombre_sitio); ?></h1>
                 <p class="text-gray-600 mt-2">Inicia sesión para acceder al sistema</p>
             </div>
 
@@ -216,12 +238,45 @@ if (isset($_GET['success'])) {
 
             <!-- Información adicional -->
             <div class="mt-6 text-center text-sm text-gray-600">
-                <p>Para más información, contacta con nosotros:</p>
-                <p class="mt-1">
-                    <a href="mailto:contacto@camaraqro.com" class="text-blue-600 hover:underline">
-                        contacto@camaraqro.com
+                <?php
+                // Obtener información de contacto desde configuración
+                $email_contacto = '';
+                $telefono_contacto = '';
+                $horario_atencion = '';
+                try {
+                    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('email_contacto', 'telefono_contacto', 'horario_atencion')");
+                    while ($row = $stmt->fetch()) {
+                        if ($row['clave'] === 'email_contacto') {
+                            $email_contacto = $row['valor'];
+                        } elseif ($row['clave'] === 'telefono_contacto') {
+                            $telefono_contacto = $row['valor'];
+                        } elseif ($row['clave'] === 'horario_atencion') {
+                            $horario_atencion = $row['valor'];
+                        }
+                    }
+                } catch (Exception $e) {}
+                ?>
+                <p class="font-semibold text-gray-700 mb-2">Para más información, contacta con nosotros:</p>
+                <?php if (!empty($email_contacto)): ?>
+                <p class="mb-1">
+                    <i class="fas fa-envelope mr-2"></i>
+                    <a href="mailto:<?php echo e($email_contacto); ?>" class="text-blue-600 hover:underline">
+                        <?php echo e($email_contacto); ?>
                     </a>
                 </p>
+                <?php endif; ?>
+                <?php if (!empty($telefono_contacto)): ?>
+                <p class="mb-1">
+                    <i class="fas fa-phone mr-2"></i>
+                    <span class="text-gray-700"><?php echo e($telefono_contacto); ?></span>
+                </p>
+                <?php endif; ?>
+                <?php if (!empty($horario_atencion)): ?>
+                <p class="mt-2 text-xs text-gray-500">
+                    <i class="fas fa-clock mr-1"></i>
+                    <?php echo e($horario_atencion); ?>
+                </p>
+                <?php endif; ?>
             </div>
         </div>
     </div>

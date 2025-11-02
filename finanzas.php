@@ -94,25 +94,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         'metodo_pago' => sanitize($_POST['metodo_pago'] ?? ''),
         'referencia' => sanitize($_POST['referencia'] ?? ''),
         'empresa_id' => !empty($_POST['empresa_id']) ? intval($_POST['empresa_id']) : null,
-        'notas' => sanitize($_POST['notas'] ?? '')
+        'notas' => sanitize($_POST['notas'] ?? ''),
+        'evidencia' => ''
     ];
     
     try {
+        // Procesar archivo de evidencia (obligatorio para nuevos movimientos, opcional para edición)
+        $evidencia_subida = false;
+        if (isset($_FILES['evidencia']) && $_FILES['evidencia']['error'] === UPLOAD_ERR_OK) {
+            // Validar tamaño (máx 5MB)
+            if ($_FILES['evidencia']['size'] > 5 * 1024 * 1024) {
+                throw new Exception('El archivo es demasiado grande. Tamaño máximo: 5MB');
+            }
+            
+            $upload_dir = UPLOAD_PATH . '/finanzas/';
+            if (!file_exists($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+            
+            $file_extension = strtolower(pathinfo($_FILES['evidencia']['name'], PATHINFO_EXTENSION));
+            $allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
+            
+            if (in_array($file_extension, $allowed_extensions)) {
+                $new_filename = 'evidencia_' . time() . '_' . uniqid() . '.' . $file_extension;
+                $upload_path = $upload_dir . $new_filename;
+                
+                if (move_uploaded_file($_FILES['evidencia']['tmp_name'], $upload_path)) {
+                    $data['evidencia'] = '/public/uploads/finanzas/' . $new_filename;
+                    $evidencia_subida = true;
+                }
+            } else {
+                throw new Exception('Formato de archivo no permitido');
+            }
+        }
+        
+        // Validar que se haya subido evidencia para nuevos movimientos
+        if (empty($_POST['movimiento_id']) && !$evidencia_subida) {
+            throw new Exception('La evidencia/comprobante es obligatoria para registrar un nuevo movimiento');
+        }
+        
         if (empty($_POST['movimiento_id'])) {
             // Nuevo movimiento
             $stmt = $db->prepare("
                 INSERT INTO finanzas_movimientos 
-                (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, notas) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, evidencia, notas) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['categoria_id'], $data['tipo'], $data['concepto'], $data['descripcion'],
                 $data['monto'], $data['fecha_movimiento'], $data['metodo_pago'], $data['referencia'],
-                $data['empresa_id'], $user['id'], $data['notas']
+                $data['empresa_id'], $user['id'], $data['evidencia'], $data['notas']
             ]);
             $success = 'Movimiento registrado exitosamente';
         } else {
-            // Editar movimiento
+            // Editar movimiento (evidencia no es obligatoria al editar)
             $stmt = $db->prepare("
                 UPDATE finanzas_movimientos 
                 SET categoria_id = ?, tipo = ?, concepto = ?, descripcion = ?, monto = ?, 
@@ -209,7 +244,7 @@ if ($action === 'dashboard') {
         ");
         $movimientosPorMes = $stmt->fetchAll();
         
-        // Últimos movimientos
+        // Últimos movimientos - los duplicados se previenen en origen mediante campo 'origen' y 'pago_id'
         $stmt = $db->prepare("
             SELECT m.*, c.nombre as categoria_nombre, c.color, u.nombre as usuario_nombre, e.razon_social
             FROM finanzas_movimientos m
@@ -330,9 +365,17 @@ include __DIR__ . '/app/views/layouts/header.php';
         <h1 class="text-3xl font-bold text-gray-800">
             <i class="fas fa-chart-line mr-2"></i>Dashboard Financiero
         </h1>
-        <a href="?action=movimientos" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-            <i class="fas fa-list mr-2"></i>Ver Todos los Movimientos
-        </a>
+        <div class="flex space-x-3">
+            <a href="?action=categorias" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition">
+                <i class="fas fa-tags mr-2"></i>Categorías Financieras
+            </a>
+            <button onclick="modalMovimiento()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
+                <i class="fas fa-plus mr-2"></i>Nuevo Movimiento
+            </button>
+            <a href="?action=movimientos" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-list mr-2"></i>Ver Todos los Movimientos
+            </a>
+        </div>
     </div>
 
     <?php if ($success): ?>
@@ -1079,7 +1122,7 @@ function cerrarModalCategoria() {
             </button>
         </div>
         
-        <form method="POST" class="space-y-4">
+        <form method="POST" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="action" value="save_movimiento">
             <input type="hidden" name="movimiento_id" id="movimiento_id">
             
@@ -1167,6 +1210,18 @@ function cerrarModalCategoria() {
                 <label class="block text-gray-700 font-semibold mb-2">Notas</label>
                 <textarea name="notas" id="movimiento_notas" rows="2"
                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">
+                    Evidencia / Comprobante *
+                    <span class="text-red-500 text-xs">(Obligatorio)</span>
+                </label>
+                <input type="file" name="evidencia" id="movimiento_evidencia" required
+                       accept="image/*,application/pdf,.doc,.docx"
+                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <p class="text-sm text-gray-500 mt-1">Formatos aceptados: JPG, PNG, PDF, DOC, DOCX (máx. 5MB)</p>
+                <div id="evidencia_preview" class="mt-2"></div>
             </div>
             
             <div class="flex gap-3">
