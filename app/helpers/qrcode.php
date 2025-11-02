@@ -13,19 +13,23 @@ class QRCodeGenerator {
         return uniqid('QR', true) . bin2hex(random_bytes(8));
     }
     
+    // Default QR code size
+    const DEFAULT_QR_SIZE = 300;
+    const CONFIGURED_QR_SIZE = 400;
+    
     /**
      * Generar imagen QR usando API configurada
      * @param string $data - Datos a codificar en el QR
      * @param int $size - Tamaño de la imagen
      * @return string - URL de la imagen QR
      */
-    public static function generateQRImageURL($data, $size = 300) {
+    public static function generateQRImageURL($data, $size = self::DEFAULT_QR_SIZE) {
         $config = getConfiguracion();
         $provider = $config['qr_api_provider'] ?? 'google';
-        $configuredSize = intval($config['qr_size'] ?? 400);
+        $configuredSize = intval($config['qr_size'] ?? self::CONFIGURED_QR_SIZE);
         
         // Use configured size if provided size is default
-        if ($size == 300) {
+        if ($size == self::DEFAULT_QR_SIZE) {
             $size = $configuredSize;
         }
         

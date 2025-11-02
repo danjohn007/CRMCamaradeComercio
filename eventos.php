@@ -92,11 +92,11 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute([$inscripcion_id]);
                     
                     $success = "¡Inscripción exitosa! Se ha enviado un correo de confirmación con tu boleto digital. ";
-                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo={$codigo_qr}' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
+                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
                 } catch (Exception $e) {
                     // Si falla el envío de email, aún así la inscripción fue exitosa
                     $success = "¡Inscripción exitosa! ";
-                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo={$codigo_qr}' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
+                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
                     error_log("Error al enviar email de confirmación: " . $e->getMessage());
                 }
             }
