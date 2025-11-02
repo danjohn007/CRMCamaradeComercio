@@ -230,6 +230,14 @@ $user = getCurrentUser();
                     </a>
                     <?php endif; ?>
 
+                    <!-- Finanzas -->
+                    <?php if (hasPermission('CAPTURISTA')): ?>
+                    <a href="<?php echo BASE_URL; ?>/finanzas.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition">
+                        <i class="fas fa-dollar-sign w-5"></i>
+                        <span>Finanzas</span>
+                    </a>
+                    <?php endif; ?>
+
                     <!-- Catálogos -->
                     <?php if (hasPermission('DIRECCION')): ?>
                     <div class="pt-4 mt-4 border-t border-gray-200">

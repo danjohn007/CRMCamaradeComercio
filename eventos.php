@@ -99,10 +99,14 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
                     error_log("Error al enviar email de confirmación: " . $e->getMessage());
                 }
+                
+                // Cambiar acción a 'view' para mostrar la página del evento con el mensaje
+                $action = 'view';
             }
         }
     } catch (Exception $e) {
         $error = 'Error al procesar la inscripción: ' . $e->getMessage();
+        $action = 'view';
     }
 }
 
@@ -428,6 +432,15 @@ include __DIR__ . '/app/views/layouts/header.php';
         <?php endif; ?>
 
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <!-- Imagen del evento -->
+            <?php if ($evento['imagen']): ?>
+            <div class="w-full">
+                <img src="<?php echo BASE_URL . '/public/uploads/' . e($evento['imagen']); ?>" 
+                     alt="<?php echo e($evento['titulo']); ?>"
+                     class="w-full h-64 object-cover">
+            </div>
+            <?php endif; ?>
+            
             <!-- Banner del evento -->
             <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-8">
                 <span class="inline-block px-3 py-1 bg-white bg-opacity-20 rounded text-sm mb-3">
@@ -738,6 +751,8 @@ async function verParticipantes(eventoId) {
                 html = `
                     <div class="mb-4 text-gray-600">
                         <strong>${data.participantes.length}</strong> participante(s) inscrito(s)
+                        <span class="ml-4">-</span>
+                        <strong class="ml-2">${data.total_boletos || 0}</strong> boleto(s) total
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
@@ -746,6 +761,7 @@ async function verParticipantes(eventoId) {
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Boletos</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Inscripción</th>
                                     ${data.tiene_costo ? '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado Pago</th>' : ''}
                                 </tr>
@@ -759,6 +775,7 @@ async function verParticipantes(eventoId) {
                             <td class="px-4 py-3 text-sm text-gray-800">${p.nombre}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">${p.email || '-'}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">${p.empresa || '-'}</td>
+                            <td class="px-4 py-3 text-sm text-gray-800 font-semibold">${p.boletos_solicitados || 1}</td>
                             <td class="px-4 py-3 text-sm text-gray-600">${formatFecha(p.fecha_inscripcion)}</td>
                     `;
                     
@@ -792,6 +809,13 @@ async function verParticipantes(eventoId) {
                 
                 html += `
                             </tbody>
+                            <tfoot class="bg-gray-100 border-t-2 border-gray-300">
+                                <tr>
+                                    <td colspan="3" class="px-4 py-3 text-sm font-bold text-gray-800 text-right">TOTAL DE BOLETOS:</td>
+                                    <td class="px-4 py-3 text-sm font-bold text-blue-600">${data.total_boletos || 0}</td>
+                                    <td colspan="${data.tiene_costo ? '2' : '1'}"></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 `;

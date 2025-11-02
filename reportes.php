@@ -350,14 +350,18 @@ include __DIR__ . '/app/views/layouts/header.php';
         <!-- Gráfica 1: Ingresos por Membresía (Bar Chart) -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Ingresos por Membresía</h2>
-            <canvas id="chartIngresosMembresia" height="300"></canvas>
+            <div style="position: relative; height: 300px; max-height: 300px;">
+                <canvas id="chartIngresosMembresia"></canvas>
+            </div>
         </div>
         
         <!-- Gráfica 2: Tendencia de Ingresos Mensuales (Line Chart) -->
         <?php if (!empty($ingresosPorMes)): ?>
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Tendencia de Ingresos</h2>
-            <canvas id="chartTendenciaIngresos" height="300"></canvas>
+            <div style="position: relative; height: 300px; max-height: 300px;">
+                <canvas id="chartTendenciaIngresos"></canvas>
+            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -483,14 +487,18 @@ include __DIR__ . '/app/views/layouts/header.php';
         <!-- Gráfica 3: Distribución por Sector (Pie Chart) -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Distribución por Sector</h2>
-            <canvas id="chartEmpresasSector" height="300"></canvas>
+            <div style="position: relative; height: 300px; max-height: 300px;">
+                <canvas id="chartEmpresasSector"></canvas>
+            </div>
         </div>
         
         <!-- Gráfica 4: Crecimiento de Afiliaciones (Line Chart) -->
         <?php if (!empty($nuevasEmpresasPorMes)): ?>
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold text-gray-800 mb-4">Gráfica: Crecimiento de Afiliaciones</h2>
-            <canvas id="chartCrecimientoEmpresas" height="300"></canvas>
+            <div style="position: relative; height: 300px; max-height: 300px;">
+                <canvas id="chartCrecimientoEmpresas"></canvas>
+            </div>
         </div>
         <?php endif; ?>
     </div>
@@ -624,7 +632,7 @@ new Chart(document.getElementById('chartIngresosMembresia'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -672,7 +680,7 @@ new Chart(document.getElementById('chartTendenciaIngresos'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: true, position: 'top' },
             tooltip: {
@@ -714,7 +722,7 @@ new Chart(document.getElementById('chartEmpresasSector'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: {
                 position: 'right',
@@ -757,7 +765,7 @@ new Chart(document.getElementById('chartCrecimientoEmpresas'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: true, position: 'top' },
             tooltip: {
