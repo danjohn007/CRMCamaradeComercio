@@ -6,10 +6,8 @@
 -- ========================================================================
 -- 1. Verificar y asegurar columna 'activo' en finanzas_categorias
 -- ========================================================================
--- La columna ya existe, pero verificamos su presencia
 SELECT 'Verificando columna activo en finanzas_categorias...' AS paso;
 
--- Si por alguna razón no existe, la creamos (safe check)
 SET @dbname = DATABASE();
 SET @tablename = 'finanzas_categorias';
 SET @columnname = 'activo';
@@ -41,7 +39,6 @@ VALUES ('Pago de Membresías', 'INGRESO', 'Pagos de membresías de empresas afil
 -- ========================================================================
 SELECT 'Creando trigger para sincronizar pagos con movimientos financieros...' AS paso;
 
--- Eliminar trigger si existe
 DROP TRIGGER IF EXISTS after_pago_insert;
 
 DELIMITER $$
@@ -51,14 +48,10 @@ AFTER INSERT ON pagos
 FOR EACH ROW
 BEGIN
     DECLARE v_categoria_id INT;
-    
-    -- Obtener ID de categoría "Pago de Membresías"
     SELECT id INTO v_categoria_id 
     FROM finanzas_categorias 
     WHERE nombre = 'Pago de Membresías' AND tipo = 'INGRESO' 
     LIMIT 1;
-    
-    -- Si la categoría existe y el pago está completado, crear movimiento financiero
     IF v_categoria_id IS NOT NULL AND NEW.estado = 'COMPLETADO' THEN
         INSERT INTO finanzas_movimientos 
         (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, 
@@ -87,8 +80,6 @@ DELIMITER ;
 -- ========================================================================
 SELECT 'Sincronizando pagos existentes con movimientos financieros...' AS paso;
 
--- Insertar movimientos financieros para pagos completados que no tienen movimiento asociado
--- Usando una verificación más eficiente: buscamos coincidencias exactas en múltiples campos
 INSERT INTO finanzas_movimientos 
 (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, 
  referencia, empresa_id, usuario_id, notas, created_at)
@@ -138,18 +129,66 @@ EXECUTE alterIfNotExists;
 DEALLOCATE PREPARE alterIfNotExists;
 
 -- ========================================================================
--- 6. Índices adicionales para optimizar consultas
+-- 6. Índices adicionales para optimizar consultas (compatible MySQL)
 -- ========================================================================
-SELECT 'Creando índices adicionales para optimización...' AS paso;
+SELECT 'Creando índices adicionales para optimización (compatible MySQL)...' AS paso;
 
 -- Índice en finanzas_movimientos para búsquedas por empresa
-CREATE INDEX IF NOT EXISTS idx_empresa_id ON finanzas_movimientos(empresa_id);
+SET @dbname = DATABASE();
+SET @tablename = 'finanzas_movimientos';
+SET @indexname = 'idx_empresa_id';
+SET @preparedStatement = (
+    SELECT IF(
+        (
+            SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE table_schema = @dbname
+            AND table_name = @tablename
+            AND index_name = @indexname
+        ) > 0,
+        'SELECT ''Index already exists'' AS result',
+        CONCAT('CREATE INDEX ', @indexname, ' ON ', @tablename, '(empresa_id)')
+    )
+);
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Índice en finanzas_movimientos para búsquedas por fecha
-CREATE INDEX IF NOT EXISTS idx_fecha_movimiento ON finanzas_movimientos(fecha_movimiento);
+SET @indexname = 'idx_fecha_movimiento';
+SET @preparedStatement = (
+    SELECT IF(
+        (
+            SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE table_schema = @dbname
+            AND table_name = @tablename
+            AND index_name = @indexname
+        ) > 0,
+        'SELECT ''Index already exists'' AS result',
+        CONCAT('CREATE INDEX ', @indexname, ' ON ', @tablename, '(fecha_movimiento)')
+    )
+);
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Índice en pagos para evidencia
-CREATE INDEX IF NOT EXISTS idx_evidencia_pago ON pagos(evidencia_pago);
+SET @tablename = 'pagos';
+SET @indexname = 'idx_evidencia_pago';
+SET @preparedStatement = (
+    SELECT IF(
+        (
+            SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE table_schema = @dbname
+            AND table_name = @tablename
+            AND index_name = @indexname
+        ) > 0,
+        'SELECT ''Index already exists'' AS result',
+        CONCAT('CREATE INDEX ', @indexname, ' ON ', @tablename, '(evidencia_pago)')
+    )
+);
+PREPARE stmt FROM @preparedStatement;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ========================================================================
 -- 7. Actualizar permisos y privilegios (si es necesario)
