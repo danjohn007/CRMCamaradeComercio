@@ -458,7 +458,7 @@ new Chart(document.getElementById('chartIngresos'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { position: 'right', labels: { padding: 10, font: { size: 11 } } },
             tooltip: {
@@ -487,7 +487,7 @@ new Chart(document.getElementById('chartEgresos'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { position: 'right', labels: { padding: 10, font: { size: 11 } } },
             tooltip: {
@@ -557,7 +557,7 @@ new Chart(document.getElementById('chartTendencia'), {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: true, position: 'top' },
             tooltip: {
@@ -1091,8 +1091,7 @@ document.getElementById('empresa_search')?.addEventListener('input', function(e)
         return;
     }
     
-    // Aquí podrías hacer una llamada AJAX para buscar empresas
-    // Por ahora, dejamos la funcionalidad básica
+    // Funcionalidad de búsqueda de empresas puede agregarse en versión futura si es necesario
 });
 </script>
 
