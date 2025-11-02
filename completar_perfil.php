@@ -19,12 +19,78 @@ if (!in_array($user['rol'], ['ENTIDAD_COMERCIAL', 'EMPRESA_TRACTORA'])) {
     exit;
 }
 
+// Procesar asociación de empresa por RFC
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'asociar_empresa') {
+    $rfc_buscar = strtoupper(sanitize($_POST['rfc_buscar'] ?? ''));
+    
+    try {
+        // Validar que se haya subido constancia fiscal
+        if (!isset($_FILES['constancia_fiscal']) || $_FILES['constancia_fiscal']['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception('La Constancia de Situación Fiscal es obligatoria');
+        }
+        
+        // Validar tamaño (máx 5MB)
+        if ($_FILES['constancia_fiscal']['size'] > 5 * 1024 * 1024) {
+            throw new Exception('El archivo es demasiado grande. Tamaño máximo: 5MB');
+        }
+        
+        // Buscar empresa por RFC
+        $stmt = $db->prepare("SELECT * FROM empresas WHERE rfc = ? AND activo = 1");
+        $stmt->execute([$rfc_buscar]);
+        $empresa_encontrada = $stmt->fetch();
+        
+        if (!$empresa_encontrada) {
+            throw new Exception('No se encontró ninguna empresa con ese RFC');
+        }
+        
+        // Subir constancia fiscal
+        $upload_dir = UPLOAD_PATH . '/constancias/';
+        if (!file_exists($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['constancia_fiscal']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['pdf'];
+        
+        if (!in_array($file_extension, $allowed_extensions)) {
+            throw new Exception('Solo se permiten archivos PDF para la constancia fiscal');
+        }
+        
+        $new_filename = 'constancia_' . $rfc_buscar . '_' . time() . '.pdf';
+        $upload_path = $upload_dir . $new_filename;
+        
+        if (!move_uploaded_file($_FILES['constancia_fiscal']['tmp_name'], $upload_path)) {
+            throw new Exception('Error al subir el archivo');
+        }
+        
+        $constancia_path = '/public/uploads/constancias/' . $new_filename;
+        
+        // Asociar empresa al usuario
+        $stmt = $db->prepare("UPDATE usuarios SET empresa_id = ?, constancia_fiscal = ? WHERE id = ?");
+        $stmt->execute([$empresa_encontrada['id'], $constancia_path, $user['id']]);
+        
+        // Registrar en auditoría
+        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id, detalles) VALUES (?, 'ASOCIAR_EMPRESA', 'empresas', ?, ?)");
+        $stmt->execute([$user['id'], $empresa_encontrada['id'], 'Usuario asociado a empresa: ' . $empresa_encontrada['razon_social']]);
+        
+        $success = 'Empresa asociada exitosamente';
+        
+        // Recargar usuario
+        $_SESSION['empresa_id'] = $empresa_encontrada['id'];
+        $user['empresa_id'] = $empresa_encontrada['id'];
+        
+    } catch (Exception $e) {
+        $error = 'Error al asociar empresa: ' . $e->getMessage();
+    }
+}
+
 // Verificar que el usuario tiene empresa asociada
 if (!$user['empresa_id']) {
-    $error = 'No tiene una empresa asociada';
+    $mostrar_asociar = true;
     $empresa = null;
     $completitud = null;
 } else {
+    $mostrar_asociar = false;
     // Obtener información de la empresa
     $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
     $stmt->execute([$user['empresa_id']]);
@@ -160,7 +226,111 @@ include __DIR__ . '/app/views/layouts/header.php';
         </div>
     <?php endif; ?>
 
-    <?php if ($empresa && $completitud): ?>
+    <?php if ($mostrar_asociar): ?>
+        <!-- Formulario para asociar empresa -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-building mr-2 text-blue-600"></i>Asociar Empresa
+            </h2>
+            <p class="text-gray-600 mb-6">
+                Para completar tu perfil, primero debes asociar tu cuenta con una empresa registrada. 
+                Busca tu empresa por RFC y adjunta tu Constancia de Situación Fiscal actualizada.
+            </p>
+            
+            <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" name="action" value="asociar_empresa">
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        RFC de la Empresa *
+                    </label>
+                    <input type="text" name="rfc_buscar" id="rfc_buscar" required
+                           maxlength="13" placeholder="ABC123456XYZ"
+                           oninput="buscarEmpresaPorRFC(this.value)"
+                           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    <div id="empresa_info" class="mt-3"></div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">
+                        Constancia de Situación Fiscal Actualizada *
+                        <span class="text-red-500 text-xs">(Obligatorio - Solo PDF)</span>
+                    </label>
+                    <input type="file" name="constancia_fiscal" required
+                           accept="application/pdf"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <p class="text-sm text-gray-500 mt-1">Solo archivos PDF (máx. 5MB)</p>
+                </div>
+                
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                    <p class="text-sm text-yellow-700">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>Importante:</strong> Una vez asociada la empresa, podrás editar la información 
+                        excepto: RFC, Membresía, Vendedor/Afiliador, Tipo de Afiliación y Fecha de Renovación.
+                    </p>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button type="submit" 
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-link mr-2"></i>Asociar Empresa
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <script>
+        let buscarTimeout;
+        function buscarEmpresaPorRFC(rfc) {
+            clearTimeout(buscarTimeout);
+            const infoDiv = document.getElementById('empresa_info');
+            
+            if (rfc.length < 12) {
+                infoDiv.innerHTML = '';
+                return;
+            }
+            
+            buscarTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch('<?php echo BASE_URL; ?>/api/buscar_empresa.php?rfc=' + encodeURIComponent(rfc));
+                    const data = await response.json();
+                    
+                    if (data.success && data.empresa) {
+                        const emp = data.empresa;
+                        infoDiv.innerHTML = `
+                            <div class="p-4 bg-green-50 border-l-4 border-green-500 rounded">
+                                <p class="text-sm text-green-700 font-semibold mb-2">
+                                    <i class="fas fa-check-circle mr-2"></i>Empresa encontrada:
+                                </p>
+                                <p class="text-gray-700"><strong>Razón Social:</strong> ${emp.razon_social}</p>
+                                <p class="text-gray-600 text-sm"><strong>Email:</strong> ${emp.email || 'No registrado'}</p>
+                                <p class="text-gray-600 text-sm"><strong>Teléfono:</strong> ${emp.telefono || 'No registrado'}</p>
+                            </div>
+                        `;
+                    } else {
+                        infoDiv.innerHTML = `
+                            <div class="p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                                <p class="text-sm text-red-700">
+                                    <i class="fas fa-times-circle mr-2"></i>No se encontró ninguna empresa con ese RFC
+                                </p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Error al buscar empresa:', error);
+                    infoDiv.innerHTML = `
+                        <div class="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                            <p class="text-sm text-yellow-700">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Error al buscar empresa
+                            </p>
+                        </div>
+                    `;
+                }
+            }, 500);
+        }
+        </script>
+        
+    <?php elseif ($empresa && $completitud): ?>
         
         <!-- Indicador de progreso -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
