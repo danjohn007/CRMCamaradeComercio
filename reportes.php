@@ -250,10 +250,13 @@ include __DIR__ . '/app/views/layouts/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="flex items-end">
-                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+            <div class="flex items-end gap-2">
+                <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                     Generar Reporte
                 </button>
+                <a href="?tipo=ingresos" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 text-center">
+                    <i class="fas fa-times mr-2"></i>Limpiar
+                </a>
             </div>
         </form>
     </div>

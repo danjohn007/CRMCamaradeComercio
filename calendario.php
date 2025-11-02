@@ -31,28 +31,47 @@ include __DIR__ . '/app/views/layouts/header.php';
 
     <!-- Filtros de calendario -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div class="flex flex-wrap items-center gap-4">
-            <label class="flex items-center space-x-2">
-                <input type="checkbox" id="mostrarEventos" checked 
-                       class="form-checkbox h-5 w-5 text-blue-600">
-                <span class="text-gray-700">Eventos</span>
-            </label>
-            
-            <?php if ($es_interno): ?>
-            <label class="flex items-center space-x-2">
-                <input type="checkbox" id="mostrarRenovaciones" checked 
-                       class="form-checkbox h-5 w-5 text-orange-600">
-                <span class="text-gray-700">Renovaciones</span>
-            </label>
-            <?php endif; ?>
-            
-            <label class="flex items-center space-x-2">
-                <input type="checkbox" id="mostrarReuniones" checked 
-                       class="form-checkbox h-5 w-5 text-purple-600">
-                <span class="text-gray-700">Reuniones</span>
-            </label>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="mostrarEventos" checked 
+                           class="form-checkbox h-5 w-5 text-blue-600">
+                    <span class="text-gray-700">Eventos</span>
+                </label>
+                
+                <?php if ($es_interno): ?>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="mostrarRenovaciones" checked 
+                           class="form-checkbox h-5 w-5 text-orange-600">
+                    <span class="text-gray-700">Renovaciones</span>
+                </label>
+                <?php endif; ?>
+                
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="mostrarReuniones" checked 
+                           class="form-checkbox h-5 w-5 text-purple-600">
+                    <span class="text-gray-700">Reuniones</span>
+                </label>
+            </div>
+            <button onclick="limpiarFiltros()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+                <i class="fas fa-times mr-2"></i>Limpiar Filtros
+            </button>
         </div>
     </div>
+    
+    <script>
+    function limpiarFiltros() {
+        document.getElementById('mostrarEventos').checked = true;
+        <?php if ($es_interno): ?>
+        document.getElementById('mostrarRenovaciones').checked = true;
+        <?php endif; ?>
+        document.getElementById('mostrarReuniones').checked = true;
+        // Trigger calendar reload if needed
+        if (typeof calendar !== 'undefined' && calendar.refetchEvents) {
+            calendar.refetchEvents();
+        }
+    }
+    </script>
 
     <!-- Leyenda -->
     <div class="bg-white rounded-lg shadow-md p-4 mb-6">

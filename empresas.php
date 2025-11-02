@@ -212,7 +212,7 @@ if ($action === 'list' || $action === 'suspendidas') {
     $whereSql = implode(' AND ', $where);
     
     $sql = "SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre, 
-            m.nombre as membresia_nombre, u.nombre as vendedor_nombre
+            m.nombre as membresia_nombre, m.costo as membresia_costo, u.nombre as vendedor_nombre
             FROM empresas e
             LEFT JOIN sectores s ON e.sector_id = s.id
             LEFT JOIN categorias c ON e.categoria_id = c.id
@@ -288,9 +288,14 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </option>
                 <?php endforeach; ?>
             </select>
-            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                <i class="fas fa-search mr-2"></i>Buscar
-            </button>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-search mr-2"></i>Buscar
+                </button>
+                <a href="?action=list" class="flex-1 bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 text-center">
+                    <i class="fas fa-times mr-2"></i>Limpiar
+                </a>
+            </div>
         </form>
     </div>
 
@@ -339,7 +344,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                                title="Editar">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <button onclick="abrirModalPago(<?php echo $empresa['id']; ?>, '<?php echo addslashes($empresa['razon_social']); ?>')" 
+                            <button onclick="abrirModalPago(<?php echo $empresa['id']; ?>, '<?php echo addslashes($empresa['razon_social']); ?>', '<?php echo addslashes($empresa['membresia_nombre'] ?? ''); ?>', <?php echo floatval($empresa['membresia_costo'] ?? 0); ?>)" 
                                class="text-purple-600 hover:text-purple-800"
                                title="Registrar pago">
                                 <i class="fas fa-dollar-sign"></i>
@@ -821,7 +826,7 @@ if (!$empresa) {
             
             <div class="mb-4">
                 <label class="block text-gray-700 font-semibold mb-2">Concepto *</label>
-                <input type="text" name="concepto" required 
+                <input type="text" id="concepto_pago" name="concepto" required 
                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
                        placeholder="Ej: Pago de Membresía 2024">
             </div>
@@ -829,7 +834,7 @@ if (!$empresa) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Monto * ($)</label>
-                    <input type="number" name="monto" step="0.01" min="0.01" required 
+                    <input type="number" id="monto_pago" name="monto" step="0.01" min="0.01" required 
                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
                            placeholder="0.00">
                 </div>
@@ -864,10 +869,10 @@ if (!$empresa) {
             </div>
             
             <div class="mb-4">
-                <label class="block text-gray-700 font-semibold mb-2">Evidencia de Pago</label>
-                <input type="file" name="evidencia" accept=".jpg,.jpeg,.png,.pdf" 
+                <label class="block text-gray-700 font-semibold mb-2">Evidencia de Pago *</label>
+                <input type="file" name="evidencia" accept=".jpg,.jpeg,.png,.pdf" required
                        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                <p class="text-sm text-gray-500 mt-1">Formatos permitidos: JPG, PNG, PDF (máx. 5MB)</p>
+                <p class="text-sm text-gray-500 mt-1">Formatos permitidos: JPG, PNG, PDF (máx. 5MB) - Obligatorio</p>
             </div>
             
             <div class="mb-6">
@@ -896,10 +901,21 @@ if (!$empresa) {
 </div>
 
 <script>
-function abrirModalPago(empresaId, empresaNombre) {
+function abrirModalPago(empresaId, empresaNombre, membresiaNombre, membresiaCosto) {
     document.getElementById('formPago').reset();
     document.getElementById('empresa_id').value = empresaId;
     document.getElementById('empresa_nombre').value = empresaNombre;
+    
+    // Precargar concepto con nombre de membresía
+    if (membresiaNombre) {
+        document.getElementById('concepto_pago').value = 'Pago de Membresía ' + membresiaNombre;
+    }
+    
+    // Precargar monto con costo de membresía
+    if (membresiaCosto && membresiaCosto > 0) {
+        document.getElementById('monto_pago').value = membresiaCosto.toFixed(2);
+    }
+    
     document.getElementById('pagoError').classList.add('hidden');
     document.getElementById('modalPago').classList.remove('hidden');
 }

@@ -48,6 +48,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// Desactivar categoría (soft delete)
+if ($action === 'deactivate_categoria' && $id && hasPermission('DIRECCION')) {
+    try {
+        $stmt = $db->prepare("UPDATE finanzas_categorias SET activo = 0 WHERE id = ?");
+        $stmt->execute([$id]);
+        
+        // Registrar auditoría
+        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'DEACTIVATE_FINANZAS_CATEGORIA', 'finanzas_categorias', ?)");
+        $stmt->execute([$user['id'], $id]);
+        
+        $success = 'Categoría desactivada exitosamente';
+        $action = 'categorias';
+    } catch (Exception $e) {
+        $error = 'Error al desactivar la categoría: ' . $e->getMessage();
+    }
+}
+
+// Activar categoría
+if ($action === 'activate_categoria' && $id && hasPermission('DIRECCION')) {
+    try {
+        $stmt = $db->prepare("UPDATE finanzas_categorias SET activo = 1 WHERE id = ?");
+        $stmt->execute([$id]);
+        
+        // Registrar auditoría
+        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'ACTIVATE_FINANZAS_CATEGORIA', 'finanzas_categorias', ?)");
+        $stmt->execute([$user['id'], $id]);
+        
+        $success = 'Categoría activada exitosamente';
+        $action = 'categorias_inactivas';
+    } catch (Exception $e) {
+        $error = 'Error al activar la categoría: ' . $e->getMessage();
+    }
+}
+
 // Procesar formulario de nuevo movimiento
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_movimiento') {
     $data = [
@@ -194,12 +228,12 @@ if ($action === 'dashboard') {
     }
 }
 
-// Listar categorías
+// Listar categorías activas
 if ($action === 'categorias') {
     try {
         $tipo_filtro = $_GET['tipo'] ?? '';
         
-        $where = [];
+        $where = ['activo = 1'];
         $params = [];
         
         if ($tipo_filtro) {
@@ -207,7 +241,7 @@ if ($action === 'categorias') {
             $params[] = $tipo_filtro;
         }
         
-        $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+        $whereSql = 'WHERE ' . implode(' AND ', $where);
         
         $stmt = $db->prepare("SELECT * FROM finanzas_categorias $whereSql ORDER BY tipo, nombre");
         $stmt->execute($params);
@@ -215,6 +249,30 @@ if ($action === 'categorias') {
         
     } catch (Exception $e) {
         $error = 'Error al cargar las categorías: ' . $e->getMessage();
+    }
+}
+
+// Listar categorías inactivas
+if ($action === 'categorias_inactivas') {
+    try {
+        $tipo_filtro = $_GET['tipo'] ?? '';
+        
+        $where = ['activo = 0'];
+        $params = [];
+        
+        if ($tipo_filtro) {
+            $where[] = "tipo = ?";
+            $params[] = $tipo_filtro;
+        }
+        
+        $whereSql = 'WHERE ' . implode(' AND ', $where);
+        
+        $stmt = $db->prepare("SELECT * FROM finanzas_categorias $whereSql ORDER BY tipo, nombre");
+        $stmt->execute($params);
+        $categorias = $stmt->fetchAll();
+        
+    } catch (Exception $e) {
+        $error = 'Error al cargar las categorías inactivas: ' . $e->getMessage();
     }
 }
 
@@ -306,6 +364,9 @@ include __DIR__ . '/app/views/layouts/header.php';
             <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
                 <i class="fas fa-filter mr-2"></i>Filtrar
             </button>
+            <a href="?action=dashboard" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 inline-block">
+                <i class="fas fa-times mr-2"></i>Limpiar
+            </a>
         </form>
     </div>
 
@@ -590,9 +651,14 @@ new Chart(document.getElementById('chartTendencia'), {
         <h1 class="text-3xl font-bold text-gray-800">
             <i class="fas fa-tags mr-2"></i>Categorías Financieras
         </h1>
-        <button onclick="modalCategoria()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-            <i class="fas fa-plus mr-2"></i>Nueva Categoría
-        </button>
+        <div class="flex space-x-2">
+            <a href="?action=categorias_inactivas" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition">
+                <i class="fas fa-archive mr-2"></i>Ver Inactivas
+            </a>
+            <button onclick="modalCategoria()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-plus mr-2"></i>Nueva Categoría
+            </button>
+        </div>
     </div>
 
     <?php if ($success): ?>
@@ -652,6 +718,13 @@ new Chart(document.getElementById('chartTendencia'), {
                                 class="text-blue-600 hover:text-blue-800 mr-3">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <?php if (hasPermission('DIRECCION')): ?>
+                        <a href="?action=deactivate_categoria&id=<?php echo $cat['id']; ?>" 
+                           onclick="return confirm('¿Está seguro de desactivar esta categoría?')"
+                           class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -741,6 +814,93 @@ function cerrarModalCategoria() {
 }
 </script>
 
+<?php elseif ($action === 'categorias_inactivas'): ?>
+<!-- Gestión de Categorías Inactivas -->
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">
+            <i class="fas fa-archive mr-2"></i>Categorías Inactivas
+        </h1>
+        <a href="?action=categorias" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+            <i class="fas fa-arrow-left mr-2"></i>Volver a Activas
+        </a>
+    </div>
+
+    <?php if ($success): ?>
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6">
+            <p class="text-green-700"><?php echo e($success); ?></p>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($error): ?>
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+            <p class="text-red-700"><?php echo e($error); ?></p>
+        </div>
+    <?php endif; ?>
+
+    <!-- Filtros -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <form method="GET" class="flex gap-4">
+            <input type="hidden" name="action" value="categorias_inactivas">
+            <select name="tipo" class="px-4 py-2 border rounded-lg">
+                <option value="">Todos los tipos</option>
+                <option value="INGRESO" <?php echo ($_GET['tipo'] ?? '') === 'INGRESO' ? 'selected' : ''; ?>>Ingresos</option>
+                <option value="EGRESO" <?php echo ($_GET['tipo'] ?? '') === 'EGRESO' ? 'selected' : ''; ?>>Egresos</option>
+            </select>
+            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                Filtrar
+            </button>
+        </form>
+    </div>
+
+    <!-- Tabla de categorías inactivas -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <?php if (empty($categorias)): ?>
+            <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-inbox text-5xl mb-4"></i>
+                <p class="text-lg">No hay categorías inactivas</p>
+            </div>
+        <?php else: ?>
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Color</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                <?php foreach ($categorias as $cat): ?>
+                <tr class="hover:bg-gray-50 opacity-75">
+                    <td class="px-6 py-4">
+                        <span class="inline-block w-8 h-8 rounded-full" style="background-color: <?php echo e($cat['color']); ?>"></span>
+                    </td>
+                    <td class="px-6 py-4 font-semibold text-gray-800"><?php echo e($cat['nombre']); ?></td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs rounded-full font-semibold <?php echo $cat['tipo'] === 'INGRESO' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                            <?php echo $cat['tipo']; ?>
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600"><?php echo e($cat['descripcion'] ?: '-'); ?></td>
+                    <td class="px-6 py-4 text-right">
+                        <?php if (hasPermission('DIRECCION')): ?>
+                        <a href="?action=activate_categoria&id=<?php echo $cat['id']; ?>" 
+                           onclick="return confirm('¿Está seguro de activar esta categoría?')"
+                           class="text-green-600 hover:text-green-800">
+                            <i class="fas fa-check-circle"></i> Activar
+                        </a>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+    </div>
+</div>
+
 <?php elseif ($action === 'movimientos'): ?>
 <!-- Listado de Movimientos -->
 <div class="container mx-auto px-4 py-8">
@@ -798,10 +958,13 @@ function cerrarModalCategoria() {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="flex items-end">
-                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+            <div class="flex items-end gap-2">
+                <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                     <i class="fas fa-filter mr-2"></i>Filtrar
                 </button>
+                <a href="?action=movimientos" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 text-center">
+                    <i class="fas fa-times mr-2"></i>Limpiar
+                </a>
             </div>
         </form>
     </div>
