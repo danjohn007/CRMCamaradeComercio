@@ -201,6 +201,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let html = '<div class="space-y-3">';
         
+        // Mostrar imagen del evento si existe
+        if (event.extendedProps.imagen) {
+            html += `
+                <div class="mb-4">
+                    <img src="${event.extendedProps.imagen}" 
+                         alt="${event.title}" 
+                         class="w-full h-48 object-cover rounded-lg">
+                </div>
+            `;
+        }
+        
         if (event.extendedProps.description) {
             html += `<p class="text-gray-700">${event.extendedProps.description}</p>`;
         }

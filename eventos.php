@@ -17,6 +17,9 @@ $success = '';
 
 // Procesar inscripción a evento
 if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/app/helpers/qrcode.php';
+    require_once __DIR__ . '/app/helpers/email.php';
+    
     try {
         // Verificar que el evento existe y tiene cupo
         $stmt = $db->prepare("SELECT * FROM eventos WHERE id = ? AND activo = 1");
@@ -35,15 +38,67 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->fetch()) {
                 $error = 'Ya estás inscrito en este evento';
             } else {
-                // Inscribir
-                $stmt = $db->prepare("INSERT INTO eventos_inscripciones (evento_id, usuario_id, empresa_id) VALUES (?, ?, ?)");
-                $stmt->execute([$id, $user['id'], $user['empresa_id']]);
+                // Generar código QR único
+                $codigo_qr = QRCodeGenerator::generateUniqueCode();
+                
+                // Obtener datos de empresa si existe
+                $empresa_data = null;
+                if ($user['empresa_id']) {
+                    $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
+                    $stmt->execute([$user['empresa_id']]);
+                    $empresa_data = $stmt->fetch();
+                }
+                
+                // Inscribir con todos los datos necesarios
+                $stmt = $db->prepare("
+                    INSERT INTO eventos_inscripciones 
+                    (evento_id, usuario_id, empresa_id, nombre_invitado, email_invitado, 
+                     razon_social_invitado, codigo_qr, estado, boletos_solicitados) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO', 1)
+                ");
+                $stmt->execute([
+                    $id, 
+                    $user['id'], 
+                    $user['empresa_id'],
+                    $user['nombre'],
+                    $user['email'],
+                    $empresa_data['razon_social'] ?? null,
+                    $codigo_qr
+                ]);
+                
+                $inscripcion_id = $db->lastInsertId();
                 
                 // Actualizar contador
                 $stmt = $db->prepare("UPDATE eventos SET inscritos = inscritos + 1 WHERE id = ?");
                 $stmt->execute([$id]);
                 
-                $success = 'Inscripción exitosa';
+                // Obtener inscripción completa
+                $stmt = $db->prepare("SELECT * FROM eventos_inscripciones WHERE id = ?");
+                $stmt->execute([$inscripcion_id]);
+                $inscripcion = $stmt->fetch();
+                
+                // Generar y guardar imagen QR
+                try {
+                    $qrCodePath = QRCodeGenerator::saveQRImage(
+                        BASE_URL . '/boleto_digital.php?codigo=' . $codigo_qr,
+                        $codigo_qr
+                    );
+                    
+                    // Enviar email de confirmación con boleto digital
+                    EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+                    
+                    // Actualizar que el boleto fue enviado
+                    $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
+                    $stmt->execute([$inscripcion_id]);
+                    
+                    $success = "¡Inscripción exitosa! Se ha enviado un correo de confirmación con tu boleto digital. ";
+                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
+                } catch (Exception $e) {
+                    // Si falla el envío de email, aún así la inscripción fue exitosa
+                    $success = "¡Inscripción exitosa! ";
+                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
+                    error_log("Error al enviar email de confirmación: " . $e->getMessage());
+                }
             }
         }
     } catch (Exception $e) {

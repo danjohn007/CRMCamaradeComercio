@@ -53,7 +53,7 @@ try {
     
     $tiene_costo = isset($evento['costo']) && $evento['costo'] > 0;
     
-    // Obtener participantes
+    // Obtener participantes - incluyendo los que se registraron sin usuario
     $sql = "SELECT 
                 ei.id,
                 ei.fecha_inscripcion,
@@ -61,11 +61,12 @@ try {
                 ei.estado_pago,
                 ei.monto_pagado,
                 ei.fecha_pago,
-                u.nombre,
-                u.email,
-                e.razon_social as empresa
+                ei.boletos_solicitados,
+                COALESCE(u.nombre, ei.nombre_invitado) as nombre,
+                COALESCE(u.email, ei.email_invitado) as email,
+                COALESCE(e.razon_social, ei.razon_social_invitado) as empresa
             FROM eventos_inscripciones ei
-            INNER JOIN usuarios u ON ei.usuario_id = u.id
+            LEFT JOIN usuarios u ON ei.usuario_id = u.id
             LEFT JOIN empresas e ON ei.empresa_id = e.id
             WHERE ei.evento_id = ?
             ORDER BY ei.fecha_inscripcion DESC";
@@ -74,11 +75,18 @@ try {
     $stmt->execute([$evento_id]);
     $participantes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Calcular suma total de boletos
+    $total_boletos = 0;
+    foreach ($participantes as $participante) {
+        $total_boletos += intval($participante['boletos_solicitados'] ?? 1);
+    }
+    
     echo json_encode([
         'success' => true,
         'participantes' => $participantes,
         'tiene_costo' => $tiene_costo,
-        'total' => count($participantes)
+        'total' => count($participantes),
+        'total_boletos' => $total_boletos
     ]);
     
 } catch (Exception $e) {

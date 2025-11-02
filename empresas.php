@@ -17,35 +17,43 @@ $success = '';
 
 // Suspender empresa
 if ($action === 'suspend' && $id) {
-    try {
-        $stmt = $db->prepare("UPDATE empresas SET activo = 0 WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        // Registrar en auditoría
-        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'SUSPEND_EMPRESA', 'empresas', ?)");
-        $stmt->execute([$user['id'], $id]);
-        
-        $success = 'Empresa suspendida exitosamente';
-        $action = 'list';
-    } catch (Exception $e) {
-        $error = 'Error al suspender la empresa: ' . $e->getMessage();
+    if (!hasPermission('CAPTURISTA')) {
+        $error = 'No tiene permisos para suspender empresas';
+    } else {
+        try {
+            $stmt = $db->prepare("UPDATE empresas SET activo = 0 WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // Registrar en auditoría
+            $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'SUSPEND_EMPRESA', 'empresas', ?)");
+            $stmt->execute([$user['id'], $id]);
+            
+            $success = 'Empresa suspendida exitosamente';
+            $action = 'list';
+        } catch (Exception $e) {
+            $error = 'Error al suspender la empresa: ' . $e->getMessage();
+        }
     }
 }
 
 // Activar empresa
 if ($action === 'activate' && $id) {
-    try {
-        $stmt = $db->prepare("UPDATE empresas SET activo = 1 WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        // Registrar en auditoría
-        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'ACTIVATE_EMPRESA', 'empresas', ?)");
-        $stmt->execute([$user['id'], $id]);
-        
-        $success = 'Empresa activada exitosamente';
-        $action = 'suspendidas';
-    } catch (Exception $e) {
-        $error = 'Error al activar la empresa: ' . $e->getMessage();
+    if (!hasPermission('CAPTURISTA')) {
+        $error = 'No tiene permisos para activar empresas';
+    } else {
+        try {
+            $stmt = $db->prepare("UPDATE empresas SET activo = 1 WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // Registrar en auditoría
+            $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'ACTIVATE_EMPRESA', 'empresas', ?)");
+            $stmt->execute([$user['id'], $id]);
+            
+            $success = 'Empresa activada exitosamente';
+            $action = 'suspendidas';
+        } catch (Exception $e) {
+            $error = 'Error al activar la empresa: ' . $e->getMessage();
+        }
     }
 }
 

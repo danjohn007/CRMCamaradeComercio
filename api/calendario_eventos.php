@@ -39,7 +39,7 @@ try {
         if ($es_interno) {
             // Usuarios internos ven todos los eventos
             $sql = "SELECT id, titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, 
-                    tipo, cupo_maximo, inscritos, costo, requiere_inscripcion
+                    tipo, cupo_maximo, inscritos, costo, requiere_inscripcion, imagen
                     FROM eventos 
                     WHERE activo = 1 
                     AND fecha_inicio BETWEEN ? AND ?
@@ -49,7 +49,7 @@ try {
         } else {
             // Usuarios externos solo ven eventos públicos
             $sql = "SELECT id, titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, 
-                    tipo, cupo_maximo, inscritos, costo, requiere_inscripcion
+                    tipo, cupo_maximo, inscritos, costo, requiere_inscripcion, imagen
                     FROM eventos 
                     WHERE activo = 1 
                     AND tipo = 'PUBLICO'
@@ -83,6 +83,7 @@ try {
                     'inscritos' => $evento['inscritos'],
                     'costo' => $evento['costo'],
                     'requiere_inscripcion' => $evento['requiere_inscripcion'],
+                    'imagen' => $evento['imagen'] ? BASE_URL . '/public/uploads/' . $evento['imagen'] : null,
                     'url' => BASE_URL . '/eventos.php?action=view&id=' . $evento['id']
                 ]
             ];

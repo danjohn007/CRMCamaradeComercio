@@ -178,6 +178,41 @@ if (!empty($query) || !empty($sector) || !empty($categoria) || !empty($membresia
             }
         }
         
+        // Buscar en usuarios (solo para personal interno)
+        if (($tipo === 'todos' || $tipo === 'usuarios') && !empty($query) && hasPermission('CAPTURISTA')) {
+            $sql = "SELECT u.*, e.razon_social as empresa_nombre
+                    FROM usuarios u
+                    LEFT JOIN empresas e ON u.empresa_id = e.id
+                    WHERE u.activo = 1 AND (
+                        u.nombre LIKE ? OR 
+                        u.email LIKE ? OR 
+                        u.whatsapp LIKE ?
+                    )
+                    ORDER BY u.nombre ASC
+                    LIMIT 20";
+            
+            $searchTerm = "%$query%";
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$searchTerm, $searchTerm, $searchTerm]);
+            $usuarios = $stmt->fetchAll();
+            
+            foreach ($usuarios as $usuario) {
+                $resultados[] = [
+                    'tipo' => 'usuario',
+                    'id' => $usuario['id'],
+                    'titulo' => $usuario['nombre'],
+                    'descripcion' => 'Usuario del sistema - ' . ($usuario['rol'] ?? 'Sin rol asignado'),
+                    'metadata' => [
+                        'Email' => $usuario['email'],
+                        'WhatsApp' => $usuario['whatsapp'] ?? 'No especificado',
+                        'Empresa' => $usuario['empresa_nombre'] ?? 'Sin empresa',
+                        'Rol' => $usuario['rol'] ?? 'Sin rol'
+                    ],
+                    'enlace' => 'usuarios.php?action=view&id=' . $usuario['id']
+                ];
+            }
+        }
+        
         // Actualizar contador de resultados
         $stmt = $db->prepare("UPDATE busquedas SET resultados_count = ? WHERE id = LAST_INSERT_ID()");
         $stmt->execute([count($resultados)]);
@@ -221,6 +256,9 @@ include __DIR__ . '/app/views/layouts/header.php';
                         <option value="empresas" <?php echo $tipo === 'empresas' ? 'selected' : ''; ?>>Empresas</option>
                         <option value="eventos" <?php echo $tipo === 'eventos' ? 'selected' : ''; ?>>Eventos</option>
                         <option value="requerimientos" <?php echo $tipo === 'requerimientos' ? 'selected' : ''; ?>>Requerimientos</option>
+                        <?php if (hasPermission('CAPTURISTA')): ?>
+                        <option value="usuarios" <?php echo $tipo === 'usuarios' ? 'selected' : ''; ?>>Usuarios</option>
+                        <?php endif; ?>
                     </select>
                 </div>
             </div>
@@ -313,12 +351,16 @@ include __DIR__ . '/app/views/layouts/header.php';
                         $tipoColors = [
                             'empresa' => 'blue',
                             'evento' => 'green',
-                            'requerimiento' => 'purple'
+                            'requerimiento' => 'purple',
+                            'usuario' => 'indigo',
+                            'inscripcion_evento' => 'yellow'
                         ];
                         $tipoIcons = [
                             'empresa' => 'fa-building',
                             'evento' => 'fa-calendar',
-                            'requerimiento' => 'fa-file-alt'
+                            'requerimiento' => 'fa-file-alt',
+                            'usuario' => 'fa-user',
+                            'inscripcion_evento' => 'fa-ticket-alt'
                         ];
                         $color = $tipoColors[$resultado['tipo']] ?? 'gray';
                         $icon = $tipoIcons[$resultado['tipo']] ?? 'fa-circle';
@@ -373,7 +415,7 @@ include __DIR__ . '/app/views/layouts/header.php';
             <h2 class="text-2xl font-bold text-gray-800 mb-4">¿Qué estás buscando?</h2>
             <p class="text-gray-600 mb-8">Ingresa un término de búsqueda o usa los filtros avanzados</p>
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
                 <div class="p-4 border border-gray-200 rounded-lg">
                     <i class="fas fa-building text-3xl text-blue-500 mb-3"></i>
                     <h3 class="font-semibold text-gray-800 mb-2">Empresas</h3>
@@ -389,6 +431,13 @@ include __DIR__ . '/app/views/layouts/header.php';
                     <h3 class="font-semibold text-gray-800 mb-2">Requerimientos</h3>
                     <p class="text-sm text-gray-600">Descubre oportunidades comerciales</p>
                 </div>
+                <?php if (hasPermission('CAPTURISTA')): ?>
+                <div class="p-4 border border-gray-200 rounded-lg">
+                    <i class="fas fa-user text-3xl text-indigo-500 mb-3"></i>
+                    <h3 class="font-semibold text-gray-800 mb-2">Usuarios</h3>
+                    <p class="text-sm text-gray-600">Busca usuarios por nombre, email o WhatsApp</p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>
