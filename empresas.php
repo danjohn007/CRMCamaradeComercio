@@ -154,11 +154,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
 
 // Obtener datos para formulario
 if (in_array($action, ['new', 'edit'])) {
-    // Obtener sectores, categorías, membresías y vendedores
+    // Obtener sectores, categorías, membresías y afiliadores
     $sectores = $db->query("SELECT * FROM sectores WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $categorias = $db->query("SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $membresias = $db->query("SELECT * FROM membresias WHERE activo = 1 ORDER BY nombre")->fetchAll();
-    $vendedores = $db->query("SELECT * FROM vendedores WHERE activo = 1 ORDER BY nombre")->fetchAll();
+    $vendedores = $db->query("SELECT id, nombre FROM usuarios WHERE rol = 'AFILADOR' AND activo = 1 ORDER BY nombre")->fetchAll();
     
     if ($action === 'edit' && $id) {
         $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
@@ -212,12 +212,12 @@ if ($action === 'list' || $action === 'suspendidas') {
     $whereSql = implode(' AND ', $where);
     
     $sql = "SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre, 
-            m.nombre as membresia_nombre, v.nombre as vendedor_nombre
+            m.nombre as membresia_nombre, u.nombre as vendedor_nombre
             FROM empresas e
             LEFT JOIN sectores s ON e.sector_id = s.id
             LEFT JOIN categorias c ON e.categoria_id = c.id
             LEFT JOIN membresias m ON e.membresia_id = m.id
-            LEFT JOIN vendedores v ON e.vendedor_id = v.id
+            LEFT JOIN usuarios u ON e.vendedor_id = u.id
             WHERE $whereSql
             ORDER BY e.razon_social ASC";
     
@@ -473,9 +473,9 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </select>
                 </div>
 
-                <!-- Vendedor -->
+                <!-- Vendedor/Afiliador -->
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Vendedor</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Vendedor/Afiliador</label>
                     <select name="vendedor_id" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                         <option value="">Seleccionar...</option>
                         <?php foreach ($vendedores as $vendedor): ?>
@@ -629,12 +629,12 @@ include __DIR__ . '/app/views/layouts/header.php';
 <!-- Vista de detalles de empresa -->
 <?php
 $stmt = $db->prepare("SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre, 
-        m.nombre as membresia_nombre, v.nombre as vendedor_nombre
+        m.nombre as membresia_nombre, u.nombre as vendedor_nombre
         FROM empresas e
         LEFT JOIN sectores s ON e.sector_id = s.id
         LEFT JOIN categorias c ON e.categoria_id = c.id
         LEFT JOIN membresias m ON e.membresia_id = m.id
-        LEFT JOIN vendedores v ON e.vendedor_id = v.id
+        LEFT JOIN usuarios u ON e.vendedor_id = u.id
         WHERE e.id = ?");
 $stmt->execute([$id]);
 $empresa = $stmt->fetch();
@@ -753,7 +753,7 @@ if (!$empresa) {
                             <p class="font-semibold"><?php echo $empresa['fecha_renovacion'] ? formatDate($empresa['fecha_renovacion']) : 'No especificada'; ?></p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600">Vendedor</p>
+                            <p class="text-sm text-gray-600">Vendedor/Afiliador</p>
                             <p class="font-semibold"><?php echo e($empresa['vendedor_nombre'] ?: 'No especificado'); ?></p>
                         </div>
                         <div>
