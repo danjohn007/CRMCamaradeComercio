@@ -1,6 +1,8 @@
--- Script de actualización del sistema
+-- Script de actualización del sistema (versión compatible con MySQL < 8.0.16)
 -- Fecha: 2025-11-02
 -- Descripción: Correcciones y mejoras al sistema CRM
+-- NOTA: Este script usa comprobaciones en information_schema y sentencias preparadas
+-- para ser compatible con servidores que no soportan "IF NOT EXISTS" en ALTER TABLE.
 
 USE crm_camara_comercio;
 
@@ -11,50 +13,109 @@ USE crm_camara_comercio;
 -- ocurre cuando un trigger intenta actualizar la misma tabla que lo invocó.
 -- Solución: Eliminar triggers problemáticos que causan recursión.
 
--- Eliminar triggers problemáticos que actualizan la tabla empresas desde sí misma
 DROP TRIGGER IF EXISTS actualizar_porcentaje_perfil_insert;
 DROP TRIGGER IF EXISTS actualizar_porcentaje_perfil_update;
-
--- Reemplazar con triggers que NO actualizan la tabla empresas directamente
--- En su lugar, estos se pueden manejar en la lógica de aplicación
 
 -- ====================================================================
 -- 2. AGREGAR COLUMNA imagen A EVENTOS SI NO EXISTE
 -- ====================================================================
--- Para mostrar imágenes en el calendario de eventos
-ALTER TABLE eventos 
-ADD COLUMN IF NOT EXISTS imagen VARCHAR(255) DEFAULT NULL 
-AFTER descripcion;
+-- Comprobación en information_schema y ejecución condicional
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos'
+                 AND COLUMN_NAME = 'imagen');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos ADD COLUMN imagen VARCHAR(255) DEFAULT NULL AFTER descripcion',
+    'SELECT \"columna imagen ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
 
 -- ====================================================================
--- 3. AGREGAR COLUMNA boletos_solicitados SI NO EXISTE
+-- 3. AGREGAR COLUMNA boletos_solicitados A eventos_inscripciones SI NO EXISTE
 -- ====================================================================
--- Para registrar el número de boletos por inscripción
-ALTER TABLE eventos_inscripciones 
-ADD COLUMN IF NOT EXISTS boletos_solicitados INT DEFAULT 1 
-AFTER es_invitado;
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'boletos_solicitados');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN boletos_solicitados INT DEFAULT 1 AFTER es_invitado',
+    'SELECT \"columna boletos_solicitados ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
 
 -- ====================================================================
--- 4. AGREGAR ÍNDICES PARA MEJORAR BÚSQUEDAS
+-- 4. AGREGAR ÍNDICES PARA MEJORAR BÚSQUEDAS (comprobando existencia)
 -- ====================================================================
--- Índice para búsqueda de usuarios por WhatsApp y email
-ALTER TABLE usuarios
-ADD INDEX IF NOT EXISTS idx_whatsapp (whatsapp),
-ADD INDEX IF NOT EXISTS idx_email (email);
+-- Índices en tabla usuarios
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'usuarios'
+                 AND INDEX_NAME = 'idx_whatsapp');
 
--- Índice para búsqueda de empresas por WhatsApp
-ALTER TABLE empresas
-ADD INDEX IF NOT EXISTS idx_whatsapp (whatsapp);
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_whatsapp ON usuarios (whatsapp)',
+    'SELECT \"idx_whatsapp ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
 
--- Índice para búsqueda en inscripciones por campos de invitado
-ALTER TABLE eventos_inscripciones
-ADD INDEX IF NOT EXISTS idx_whatsapp_invitado (whatsapp_invitado),
-ADD INDEX IF NOT EXISTS idx_email_invitado (email_invitado);
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'usuarios'
+                 AND INDEX_NAME = 'idx_email');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_email ON usuarios (email)',
+    'SELECT \"idx_email ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
+
+-- Índice para empresas
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'empresas'
+                 AND INDEX_NAME = 'idx_whatsapp');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_whatsapp ON empresas (whatsapp)',
+    'SELECT \"idx_whatsapp (empresas) ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
+
+-- Índices para eventos_inscripciones (invitado)
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND INDEX_NAME = 'idx_whatsapp_invitado');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_whatsapp_invitado ON eventos_inscripciones (whatsapp_invitado)',
+    'SELECT \"idx_whatsapp_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND INDEX_NAME = 'idx_email_invitado');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_email_invitado ON eventos_inscripciones (email_invitado)',
+    'SELECT \"idx_email_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt;
+EXECUTE s;
+DEALLOCATE PREPARE s;
 
 -- ====================================================================
 -- 5. AGREGAR NUEVAS CONFIGURACIONES DEL SISTEMA
 -- ====================================================================
--- Configuración para API de códigos QR
 INSERT INTO configuracion (clave, valor, descripcion) 
 VALUES 
     ('qr_api_provider', 'google', 'Proveedor de API para generación de códigos QR (google, qrserver, quickchart)')
@@ -70,7 +131,6 @@ ON DUPLICATE KEY UPDATE
 -- ====================================================================
 -- 6. CREAR TRIGGER MEJORADO PARA NOTIFICACIONES (SIN ACTUALIZAR EMPRESAS)
 -- ====================================================================
--- Este trigger solo crea notificaciones, no actualiza la tabla empresas
 DROP TRIGGER IF EXISTS notificar_renovacion_proxima;
 
 DELIMITER //
@@ -123,40 +183,157 @@ END//
 DELIMITER ;
 
 -- ====================================================================
--- 7. VERIFICAR Y CREAR COLUMNAS FALTANTES EN EVENTOS_INSCRIPCIONES
+-- 7. VERIFICAR Y CREAR COLUMNAS FALTANTES EN EVENTOS_INSCRIPCIONES (varias)
 -- ====================================================================
--- Asegurar que existan todas las columnas necesarias
+-- Añadir columnas de invitado si no existen (cada una con comprobación)
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'nombre_invitado');
 
--- Columnas para datos de invitados (registro público)
-ALTER TABLE eventos_inscripciones
-ADD COLUMN IF NOT EXISTS nombre_invitado VARCHAR(255) DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS email_invitado VARCHAR(100) DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS whatsapp_invitado VARCHAR(20) DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS rfc_invitado VARCHAR(13) DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS razon_social_invitado VARCHAR(255) DEFAULT NULL;
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN nombre_invitado VARCHAR(255) DEFAULT NULL',
+    'SELECT \"nombre_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
 
--- Columnas para estado de inscripción
-ALTER TABLE eventos_inscripciones
-ADD COLUMN IF NOT EXISTS estado ENUM('PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'ASISTIO') DEFAULT 'CONFIRMADO',
-ADD COLUMN IF NOT EXISTS codigo_qr VARCHAR(100) UNIQUE DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS boleto_enviado TINYINT(1) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS fecha_envio_boleto DATETIME DEFAULT NULL;
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'email_invitado');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN email_invitado VARCHAR(100) DEFAULT NULL',
+    'SELECT \"email_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'whatsapp_invitado');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN whatsapp_invitado VARCHAR(20) DEFAULT NULL',
+    'SELECT \"whatsapp_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'rfc_invitado');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN rfc_invitado VARCHAR(13) DEFAULT NULL',
+    'SELECT \"rfc_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'razon_social_invitado');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN razon_social_invitado VARCHAR(255) DEFAULT NULL',
+    'SELECT \"razon_social_invitado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- Columnas para estado de inscripción y QR
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'estado');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN estado ENUM(''PENDIENTE'',''CONFIRMADO'',''CANCELADO'',''ASISTIO'') DEFAULT ''CONFIRMADO''',
+    'SELECT \"estado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'codigo_qr');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN codigo_qr VARCHAR(100) DEFAULT NULL',
+    'SELECT \"codigo_qr ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- Crear índice único para codigo_qr si se desea único y no existe
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND INDEX_NAME = 'ux_codigo_qr');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE UNIQUE INDEX ux_codigo_qr ON eventos_inscripciones (codigo_qr)',
+    'SELECT \"ux_codigo_qr ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'boleto_enviado');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN boleto_enviado TINYINT(1) DEFAULT 0',
+    'SELECT \"boleto_enviado ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND COLUMN_NAME = 'fecha_envio_boleto');
+
+SET @stmt = IF(@exists = 0,
+    'ALTER TABLE eventos_inscripciones ADD COLUMN fecha_envio_boleto DATETIME DEFAULT NULL',
+    'SELECT \"fecha_envio_boleto ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ====================================================================
--- 8. CREAR ÍNDICES ADICIONALES PARA RENDIMIENTO
+-- 8. CREAR ÍNDICES ADICIONALES PARA RENDIMIENTO (comprobando existencia)
 -- ====================================================================
-ALTER TABLE eventos
-ADD INDEX IF NOT EXISTS idx_tipo_fecha (tipo, fecha_inicio),
-ADD INDEX IF NOT EXISTS idx_activo_fecha (activo, fecha_inicio);
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos'
+                 AND INDEX_NAME = 'idx_tipo_fecha');
 
-ALTER TABLE eventos_inscripciones
-ADD INDEX IF NOT EXISTS idx_codigo_qr (codigo_qr),
-ADD INDEX IF NOT EXISTS idx_evento_usuario (evento_id, usuario_id);
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_tipo_fecha ON eventos (tipo, fecha_inicio)',
+    'SELECT \"idx_tipo_fecha ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos'
+                 AND INDEX_NAME = 'idx_activo_fecha');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_activo_fecha ON eventos (activo, fecha_inicio)',
+    'SELECT \"idx_activo_fecha ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND INDEX_NAME = 'idx_codigo_qr');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_codigo_qr ON eventos_inscripciones (codigo_qr)',
+    'SELECT \"idx_codigo_qr ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'eventos_inscripciones'
+                 AND INDEX_NAME = 'idx_evento_usuario');
+
+SET @stmt = IF(@exists = 0,
+    'CREATE INDEX idx_evento_usuario ON eventos_inscripciones (evento_id, usuario_id)',
+    'SELECT \"idx_evento_usuario ya existe\" as mensaje');
+PREPARE s FROM @stmt; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ====================================================================
 -- 9. VERIFICAR INTEGRIDAD DE DATOS
 -- ====================================================================
--- Actualizar contador de inscritos en eventos basado en inscripciones reales
 UPDATE eventos e 
 SET inscritos = (
     SELECT COALESCE(SUM(boletos_solicitados), 0) 
@@ -169,7 +346,6 @@ WHERE e.activo = 1;
 -- ====================================================================
 -- 10. LIMPIAR DATOS INCONSISTENTES
 -- ====================================================================
--- Asegurar que los boletos solicitados no sean nulos
 UPDATE eventos_inscripciones 
 SET boletos_solicitados = 1 
 WHERE boletos_solicitados IS NULL OR boletos_solicitados < 1;
@@ -178,13 +354,13 @@ WHERE boletos_solicitados IS NULL OR boletos_solicitados < 1;
 -- RESUMEN DE CAMBIOS
 -- ====================================================================
 -- 1. ✓ Eliminados triggers problemáticos que causaban el error de recursión
--- 2. ✓ Agregada columna imagen a eventos para el calendario
--- 3. ✓ Agregada columna boletos_solicitados a inscripciones
--- 4. ✓ Agregados índices para mejorar búsquedas de usuarios
+-- 2. ✓ Agregada columna imagen a eventos (comprobada previamente)
+-- 3. ✓ Agregada columna boletos_solicitados a inscripciones (comprobada previamente)
+-- 4. ✓ Agregados índices para mejorar búsquedas de usuarios (comprobados)
 -- 5. ✓ Agregadas configuraciones para API de QR
 -- 6. ✓ Creado trigger mejorado para notificaciones sin recursión
 -- 7. ✓ Verificadas todas las columnas necesarias en inscripciones
--- 8. ✓ Agregados índices para mejorar rendimiento
+-- 8. ✓ Agregados índices para mejorar rendimiento (comprobados)
 -- 9. ✓ Actualizado contador de inscritos en eventos
 -- 10. ✓ Limpiados datos inconsistentes
 
