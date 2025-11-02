@@ -99,8 +99,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     ];
     
     try {
-        // Procesar archivo de evidencia (obligatorio para nuevos movimientos)
-        if (empty($_POST['movimiento_id']) && isset($_FILES['evidencia']) && $_FILES['evidencia']['error'] === UPLOAD_ERR_OK) {
+        // Procesar archivo de evidencia (obligatorio para nuevos movimientos, opcional para edición)
+        $evidencia_subida = false;
+        if (isset($_FILES['evidencia']) && $_FILES['evidencia']['error'] === UPLOAD_ERR_OK) {
             // Validar tamaño (máx 5MB)
             if ($_FILES['evidencia']['size'] > 5 * 1024 * 1024) {
                 throw new Exception('El archivo es demasiado grande. Tamaño máximo: 5MB');
@@ -120,12 +121,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 
                 if (move_uploaded_file($_FILES['evidencia']['tmp_name'], $upload_path)) {
                     $data['evidencia'] = '/public/uploads/finanzas/' . $new_filename;
+                    $evidencia_subida = true;
                 }
             } else {
                 throw new Exception('Formato de archivo no permitido');
             }
-        } elseif (empty($_POST['movimiento_id'])) {
-            throw new Exception('La evidencia/comprobante es obligatoria');
+        }
+        
+        // Validar que se haya subido evidencia para nuevos movimientos
+        if (empty($_POST['movimiento_id']) && !$evidencia_subida) {
+            throw new Exception('La evidencia/comprobante es obligatoria para registrar un nuevo movimiento');
         }
         
         if (empty($_POST['movimiento_id'])) {
@@ -239,7 +244,7 @@ if ($action === 'dashboard') {
         ");
         $movimientosPorMes = $stmt->fetchAll();
         
-        // Últimos movimientos - evitar duplicados con GROUP BY
+        // Últimos movimientos - los duplicados se previenen en origen mediante campo 'origen' y 'pago_id'
         $stmt = $db->prepare("
             SELECT m.*, c.nombre as categoria_nombre, c.color, u.nombre as usuario_nombre, e.razon_social
             FROM finanzas_movimientos m
@@ -247,7 +252,6 @@ if ($action === 'dashboard') {
             JOIN usuarios u ON m.usuario_id = u.id
             LEFT JOIN empresas e ON m.empresa_id = e.id
             WHERE m.fecha_movimiento BETWEEN ? AND ?
-            GROUP BY m.id
             ORDER BY m.fecha_movimiento DESC, m.created_at DESC
             LIMIT 10
         ");

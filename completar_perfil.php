@@ -52,8 +52,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $file_extension = strtolower(pathinfo($_FILES['constancia_fiscal']['name'], PATHINFO_EXTENSION));
         $allowed_extensions = ['pdf'];
         
+        // Validar extensión
         if (!in_array($file_extension, $allowed_extensions)) {
             throw new Exception('Solo se permiten archivos PDF para la constancia fiscal');
+        }
+        
+        // Validar MIME type real del archivo
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime_type = finfo_file($finfo, $_FILES['constancia_fiscal']['tmp_name']);
+        finfo_close($finfo);
+        
+        if ($mime_type !== 'application/pdf') {
+            throw new Exception('El archivo debe ser un PDF válido');
         }
         
         $new_filename = 'constancia_' . $rfc_buscar . '_' . time() . '.pdf';
