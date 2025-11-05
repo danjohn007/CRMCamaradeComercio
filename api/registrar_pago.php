@@ -127,22 +127,23 @@ try {
             $categoria_id = $categoria['id'];
         }
         
-        // Insertar movimiento financiero
+        // Insertar movimiento financiero con origen 'PAGO' para evitar duplicados en dashboard
         $stmt = $db->prepare("
             INSERT INTO finanzas_movimientos 
-            (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, notas) 
-            VALUES (?, 'INGRESO', ?, 'Generado automáticamente desde Registrar Pago', ?, ?, ?, ?, ?, ?, ?)
+            (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, origen, pago_id, notas) 
+            VALUES (?, 'INGRESO', ?, 'Generado automáticamente desde Registrar Pago', ?, ?, ?, ?, ?, ?, 'PAGO', ?, ?)
         ");
         $stmt->execute([
-            $categoria_id,
-            $concepto,
-            $monto,
-            $fecha_pago,
-            $metodo_pago,
-            $referencia,
-            $empresa_id,
-            $user['id'],
-            'PAGO_ID:' . $pago_id . ($notas ? ' - ' . $notas : '')
+            $categoria_id,        // categoria_id
+            $concepto,            // concepto
+            $monto,              // monto
+            $fecha_pago,         // fecha_movimiento
+            $metodo_pago,        // metodo_pago
+            $referencia,         // referencia
+            $empresa_id,         // empresa_id
+            $user['id'],         // usuario_id
+            $pago_id,            // pago_id
+            ($notas ? $notas : '') // notas
         ]);
     } catch (Exception $e) {
         // Log error with full context but don't fail the payment registration
