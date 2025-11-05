@@ -136,6 +136,7 @@ Campos modificados/agregados:
 - WhatsApp: 10 dígitos numéricos
 - Contraseña: mínimo 8 caracteres
 - Todos los campos marcados con * son obligatorios
+- **Validación de empresa_id**: Se verifica que el ID de empresa corresponda al RFC para prevenir manipulación
 
 ### Gestión de Empresas (empresas.php):
 - RFC: obligatorio, 12-13 caracteres
@@ -144,6 +145,41 @@ Campos modificados/agregados:
 - Vendedor: opcional, solo usuarios AFILADOR
 - Tipo de Afiliación: opcional, SIEM o MEMBRESÍA
 - Tipo de Registro: opcional, Nueva o Actualización
+
+## Seguridad
+
+### Protecciones Implementadas:
+
+1. **Rate Limiting en API Pública**:
+   - Máximo 10 búsquedas por RFC por minuto por sesión
+   - Previene enumeración masiva de empresas
+   - Retorna código HTTP 429 cuando se excede el límite
+
+2. **Limitación de Datos Expuestos**:
+   - API pública solo retorna: id, razon_social, rfc, email, telefono, whatsapp, representante
+   - No se exponen datos sensibles como direcciones completas, sectores, membresías
+
+3. **Validación de Empresa ID**:
+   - Se verifica que el empresa_id proporcionado corresponda al RFC ingresado
+   - Previene que usuarios manipulen el campo oculto para modificar otras empresas
+
+4. **Rate Limiting Cliente**:
+   - Debouncing de 800ms en búsquedas por RFC
+   - Mínimo 1 segundo entre búsquedas consecutivas
+   - Previene sobrecarga del servidor
+
+5. **Protección XSS**:
+   - Sanitización de datos en JavaScript antes de insertar en formulario
+   - Validación de content-type en respuestas API
+   - Uso de textContent en lugar de innerHTML donde es posible
+
+6. **SQL Injection Prevention**:
+   - Uso de consultas preparadas (prepared statements) en todas las queries
+   - Parámetros sanitizados antes de uso
+
+7. **Transacciones de Base de Datos**:
+   - Uso de transacciones para garantizar consistencia de datos
+   - Rollback automático en caso de error
 
 ## Compatibilidad
 
