@@ -20,18 +20,22 @@ if (!isset($_SESSION['captcha_num1'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Paso 1: Registro inicial
+    // Capturar datos del formulario incluyendo datos de empresa
     $email = sanitize($_POST['email'] ?? '');
     $rfc = strtoupper(sanitize($_POST['rfc'] ?? ''));
+    $razon_social = sanitize($_POST['razon_social'] ?? '');
     $whatsapp = sanitize($_POST['whatsapp'] ?? '');
+    $telefono = sanitize($_POST['telefono'] ?? '');
+    $representante = sanitize($_POST['representante'] ?? '');
     $password = $_POST['password'] ?? '';
     $password_confirm = $_POST['password_confirm'] ?? '';
     $captcha_respuesta = intval($_POST['captcha_respuesta'] ?? 0);
     $terminos = isset($_POST['terminos']);
+    $empresa_id_existente = intval($_POST['empresa_id_existente'] ?? 0);
     
     // Validaciones
-    if (empty($email) || empty($rfc) || empty($whatsapp) || empty($password)) {
-        $error = 'Todos los campos son obligatorios';
+    if (empty($email) || empty($rfc) || empty($razon_social) || empty($whatsapp) || empty($password)) {
+        $error = 'Todos los campos obligatorios deben ser completados';
     } elseif (!validarEmail($email)) {
         $error = 'El email no es válido';
     } elseif (!validarRFC($rfc)) {
@@ -50,27 +54,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $db = Database::getInstance()->getConnection();
             
-            // Verificar si el email ya existe
+            // Verificar si el email ya existe en usuarios
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
             $stmt->execute([$email]);
             if ($stmt->fetch()) {
-                $error = 'Este email ya está registrado';
+                $error = 'Este email ya está registrado. Por favor inicia sesión.';
             } else {
-                // Verificar si el RFC ya existe
-                $stmt = $db->prepare("SELECT id FROM empresas WHERE rfc = ?");
-                $stmt->execute([$rfc]);
-                if ($stmt->fetch()) {
-                    $error = 'Este RFC ya está registrado';
-                } else {
+                // Comenzar transacción
+                $db->beginTransaction();
+                
+                try {
+                    // Si existe una empresa con este RFC, actualizar sus datos
+                    if ($empresa_id_existente > 0) {
+                        $stmt = $db->prepare("UPDATE empresas SET razon_social = ?, email = ?, telefono = ?, whatsapp = ?, representante = ? WHERE id = ?");
+                        $stmt->execute([$razon_social, $email, $telefono, $whatsapp, $representante, $empresa_id_existente]);
+                        $empresa_id = $empresa_id_existente;
+                    } else {
+                        // Crear nueva empresa si no existe
+                        $stmt = $db->prepare("INSERT INTO empresas (rfc, razon_social, email, telefono, whatsapp, representante, activo, verificado) VALUES (?, ?, ?, ?, ?, ?, 1, 0)");
+                        $stmt->execute([$rfc, $razon_social, $email, $telefono, $whatsapp, $representante]);
+                        $empresa_id = $db->lastInsertId();
+                    }
+                    
                     // Crear código de verificación
                     $codigo_verificacion = generateVerificationCode();
                     
                     // Hash de la contraseña
                     $password_hash = password_hash($password, PASSWORD_DEFAULT);
                     
-                    // Insertar usuario
-                    $stmt = $db->prepare("INSERT INTO usuarios (email, password, rol, codigo_verificacion, activo, email_verificado) VALUES (?, ?, 'ENTIDAD_COMERCIAL', ?, 0, 0)");
-                    $stmt->execute([$email, $password_hash, $codigo_verificacion]);
+                    // Insertar usuario vinculado a la empresa
+                    $stmt = $db->prepare("INSERT INTO usuarios (email, password, rol, empresa_id, codigo_verificacion, activo, email_verificado) VALUES (?, ?, 'ENTIDAD_COMERCIAL', ?, ?, 0, 0)");
+                    $stmt->execute([$email, $password_hash, $empresa_id, $codigo_verificacion]);
+                    
+                    // Confirmar transacción
+                    $db->commit();
                     
                     // Enviar email de verificación
                     $verify_link = BASE_URL . "/verify-email.php?code=" . $codigo_verificacion;
@@ -80,6 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Redirigir a login con mensaje de éxito
                     redirect('/login.php?success=registered');
+                } catch (Exception $e) {
+                    $db->rollBack();
+                    throw $e;
                 }
             }
         } catch (Exception $e) {
@@ -170,8 +190,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="">
+                <form method="POST" action="" id="formRegistro">
+                    <input type="hidden" id="empresa_id_existente" name="empresa_id_existente" value="">
+                    
+                    <!-- Mensaje informativo -->
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                        <p class="text-sm text-blue-700">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Importante:</strong> Ingresa el RFC de tu empresa primero. Si tu empresa ya está registrada en nuestro sistema, 
+                            los datos se cargarán automáticamente y podrás editarlos antes de crear tu cuenta.
+                        </p>
+                    </div>
+                    
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- RFC - Campo Principal -->
+                        <div class="md:col-span-2">
+                            <label for="rfc" class="block text-gray-700 font-semibold mb-2">
+                                RFC de la Empresa *
+                            </label>
+                            <input 
+                                type="text" 
+                                id="rfc" 
+                                name="rfc" 
+                                required
+                                maxlength="13"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="ABC123456XYZ"
+                                value="<?php echo htmlspecialchars($rfc ?? ''); ?>"
+                                oninput="this.value = this.value.toUpperCase(); buscarEmpresaPorRFC(this.value);"
+                            >
+                            <p class="text-xs text-gray-500 mt-1">12 o 13 caracteres</p>
+                            <div id="rfc_mensaje" class="mt-2"></div>
+                        </div>
+
+                        <!-- Razón Social -->
+                        <div class="md:col-span-2">
+                            <label for="razon_social" class="block text-gray-700 font-semibold mb-2">
+                                Razón Social *
+                            </label>
+                            <input 
+                                type="text" 
+                                id="razon_social" 
+                                name="razon_social" 
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="Nombre o razón social de la empresa"
+                                value="<?php echo htmlspecialchars($razon_social ?? ''); ?>"
+                            >
+                        </div>
+
                         <!-- Email -->
                         <div class="md:col-span-2">
                             <label for="email" class="block text-gray-700 font-semibold mb-2">
@@ -186,24 +253,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 placeholder="empresa@ejemplo.com"
                                 value="<?php echo htmlspecialchars($email ?? ''); ?>"
                             >
-                        </div>
-
-                        <!-- RFC -->
-                        <div>
-                            <label for="rfc" class="block text-gray-700 font-semibold mb-2">
-                                RFC *
-                            </label>
-                            <input 
-                                type="text" 
-                                id="rfc" 
-                                name="rfc" 
-                                required
-                                maxlength="13"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                placeholder="ABC123456XYZ"
-                                value="<?php echo htmlspecialchars($rfc ?? ''); ?>"
-                            >
-                            <p class="text-xs text-gray-500 mt-1">12 o 13 caracteres</p>
                         </div>
 
                         <!-- WhatsApp -->
@@ -222,6 +271,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 value="<?php echo htmlspecialchars($whatsapp ?? ''); ?>"
                             >
                             <p class="text-xs text-gray-500 mt-1">10 dígitos sin espacios</p>
+                        </div>
+
+                        <!-- Representante Legal -->
+                        <div class="md:col-span-2">
+                            <label for="representante" class="block text-gray-700 font-semibold mb-2">
+                                Representante Legal
+                            </label>
+                            <input 
+                                type="text" 
+                                id="representante" 
+                                name="representante" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="Nombre del representante legal"
+                                value="<?php echo htmlspecialchars($representante ?? ''); ?>"
+                            >
                         </div>
 
                         <!-- Contraseña -->
@@ -344,5 +408,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
+
+    <script>
+    // Función para buscar empresa por RFC
+    let buscarRFCTimeout;
+    async function buscarEmpresaPorRFC(rfc) {
+        clearTimeout(buscarRFCTimeout);
+        const mensajeDiv = document.getElementById('rfc_mensaje');
+        
+        // Limpiar si RFC es muy corto
+        if (rfc.length < 12) {
+            mensajeDiv.innerHTML = '';
+            document.getElementById('empresa_id_existente').value = '';
+            return;
+        }
+        
+        // Esperar 500ms antes de buscar
+        buscarRFCTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch('<?php echo BASE_URL; ?>/api/buscar_empresa_publico.php?rfc=' + encodeURIComponent(rfc));
+                const data = await response.json();
+                
+                if (data.success && data.empresa) {
+                    const emp = data.empresa;
+                    
+                    // Mostrar mensaje de éxito
+                    mensajeDiv.innerHTML = `
+                        <div class="p-4 bg-green-50 border-l-4 border-green-500 rounded">
+                            <p class="text-sm text-green-700 font-semibold mb-2">
+                                <i class="fas fa-check-circle mr-2"></i>¡Empresa encontrada en el sistema!
+                            </p>
+                            <p class="text-xs text-gray-600">Los datos se han cargado automáticamente. Puedes editarlos antes de crear tu cuenta.</p>
+                        </div>
+                    `;
+                    
+                    // Guardar ID de empresa existente
+                    document.getElementById('empresa_id_existente').value = emp.id;
+                    
+                    // Llenar campos automáticamente
+                    document.getElementById('razon_social').value = emp.razon_social || '';
+                    document.getElementById('email').value = emp.email || '';
+                    document.getElementById('telefono').value = emp.telefono || '';
+                    document.getElementById('whatsapp').value = emp.whatsapp || '';
+                    document.getElementById('representante').value = emp.representante || '';
+                    
+                } else {
+                    // RFC no encontrado
+                    mensajeDiv.innerHTML = `
+                        <div class="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                            <p class="text-sm text-blue-700">
+                                <i class="fas fa-info-circle mr-2"></i>RFC no encontrado en el sistema. Completa el formulario para registrar tu empresa.
+                            </p>
+                        </div>
+                    `;
+                    document.getElementById('empresa_id_existente').value = '';
+                }
+            } catch (error) {
+                console.error('Error al buscar empresa:', error);
+                mensajeDiv.innerHTML = `
+                    <div class="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                        <p class="text-sm text-yellow-700">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Error al buscar empresa. Puedes continuar con el registro.
+                        </p>
+                    </div>
+                `;
+            }
+        }, 500);
+    }
+    </script>
 </body>
 </html>
