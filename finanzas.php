@@ -580,7 +580,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                         $categorias_modal = $db->query("SELECT * FROM finanzas_categorias WHERE activo = 1 ORDER BY tipo, nombre")->fetchAll();
                         foreach ($categorias_modal as $cat): 
                         ?>
-                            <option value="<?php echo $cat['id']; ?>" data-tipo="<?php echo $cat['tipo']; ?>">
+                            <option value="<?php echo e($cat['id']); ?>" data-tipo="<?php echo e($cat['tipo']); ?>">
                                 <?php echo e($cat['nombre']); ?>
                             </option>
                         <?php endforeach; ?>
@@ -610,7 +610,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Fecha *</label>
                     <input type="date" name="fecha_movimiento" id="movimiento_fecha" required
-                           value="<?php echo date('Y-m-d'); ?>"
+                           value="<?php echo e(date('Y-m-d')); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
@@ -1352,7 +1352,7 @@ function cerrarModalCategoria() {
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Fecha *</label>
                     <input type="date" name="fecha_movimiento" id="movimiento_fecha" required
-                           value="<?php echo date('Y-m-d'); ?>"
+                           value="<?php echo e(date('Y-m-d')); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
@@ -1427,7 +1427,7 @@ function modalMovimiento() {
     document.getElementById('movimiento_concepto').value = '';
     document.getElementById('movimiento_descripcion').value = '';
     document.getElementById('movimiento_monto').value = '';
-    document.getElementById('movimiento_fecha').value = '<?php echo date('Y-m-d'); ?>';
+    document.getElementById('movimiento_fecha').value = <?php echo json_encode(date('Y-m-d')); ?>;
     document.getElementById('movimiento_metodo').value = '';
     document.getElementById('movimiento_referencia').value = '';
     document.getElementById('movimiento_empresa').value = '';
