@@ -127,11 +127,11 @@ try {
             $categoria_id = $categoria['id'];
         }
         
-        // Insertar movimiento financiero
+        // Insertar movimiento financiero con origen 'PAGO' para evitar duplicados en dashboard
         $stmt = $db->prepare("
             INSERT INTO finanzas_movimientos 
-            (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, notas) 
-            VALUES (?, 'INGRESO', ?, 'Generado automáticamente desde Registrar Pago', ?, ?, ?, ?, ?, ?, ?)
+            (categoria_id, tipo, concepto, descripcion, monto, fecha_movimiento, metodo_pago, referencia, empresa_id, usuario_id, origen, pago_id, notas) 
+            VALUES (?, 'INGRESO', ?, 'Generado automáticamente desde Registrar Pago', ?, ?, ?, ?, ?, ?, 'PAGO', ?, ?)
         ");
         $stmt->execute([
             $categoria_id,
@@ -142,6 +142,7 @@ try {
             $referencia,
             $empresa_id,
             $user['id'],
+            $pago_id,
             'PAGO_ID:' . $pago_id . ($notas ? ' - ' . $notas : '')
         ]);
     } catch (Exception $e) {

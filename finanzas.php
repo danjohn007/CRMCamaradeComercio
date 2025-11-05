@@ -194,8 +194,8 @@ if ($action === 'dashboard') {
     $fecha_fin = $_GET['fecha_fin'] ?? date('Y-m-t');
     
     try {
-        // Total de ingresos
-        $stmt = $db->prepare("SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos WHERE tipo = 'INGRESO' AND fecha_movimiento BETWEEN ? AND ?");
+        // Total de ingresos - solo movimientos manuales (evitar contar pagos duplicados)
+        $stmt = $db->prepare("SELECT COALESCE(SUM(monto), 0) as total FROM finanzas_movimientos WHERE tipo = 'INGRESO' AND fecha_movimiento BETWEEN ? AND ? AND (origen IS NULL OR origen = 'MANUAL')");
         $stmt->execute([$fecha_inicio, $fecha_fin]);
         $totalIngresos = $stmt->fetch()['total'];
         
@@ -207,12 +207,12 @@ if ($action === 'dashboard') {
         // Balance
         $balance = $totalIngresos - $totalEgresos;
         
-        // Ingresos por categoría
+        // Ingresos por categoría - solo movimientos manuales
         $stmt = $db->prepare("
             SELECT c.nombre, c.color, SUM(m.monto) as total, COUNT(m.id) as cantidad
             FROM finanzas_movimientos m
             JOIN finanzas_categorias c ON m.categoria_id = c.id
-            WHERE m.tipo = 'INGRESO' AND m.fecha_movimiento BETWEEN ? AND ?
+            WHERE m.tipo = 'INGRESO' AND m.fecha_movimiento BETWEEN ? AND ? AND (m.origen IS NULL OR m.origen = 'MANUAL')
             GROUP BY c.id
             ORDER BY total DESC
         ");
@@ -244,14 +244,14 @@ if ($action === 'dashboard') {
         ");
         $movimientosPorMes = $stmt->fetchAll();
         
-        // Últimos movimientos - los duplicados se previenen en origen mediante campo 'origen' y 'pago_id'
+        // Últimos movimientos - solo movimientos manuales (evitar duplicados de pagos)
         $stmt = $db->prepare("
             SELECT m.*, c.nombre as categoria_nombre, c.color, u.nombre as usuario_nombre, e.razon_social
             FROM finanzas_movimientos m
             JOIN finanzas_categorias c ON m.categoria_id = c.id
             JOIN usuarios u ON m.usuario_id = u.id
             LEFT JOIN empresas e ON m.empresa_id = e.id
-            WHERE m.fecha_movimiento BETWEEN ? AND ?
+            WHERE m.fecha_movimiento BETWEEN ? AND ? AND (m.origen IS NULL OR m.origen = 'MANUAL')
             ORDER BY m.fecha_movimiento DESC, m.created_at DESC
             LIMIT 10
         ");
@@ -545,6 +545,186 @@ include __DIR__ . '/app/views/layouts/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Modal de movimiento (incluido en dashboard para permitir crear movimientos desde aquí) -->
+<div id="modalMovimiento" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800" id="modalMovTitle">Nuevo Movimiento</h3>
+            <button onclick="cerrarModalMovimiento()" class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form method="POST" enctype="multipart/form-data" class="space-y-4">
+            <input type="hidden" name="action" value="save_movimiento">
+            <input type="hidden" name="movimiento_id" id="movimiento_id">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Tipo *</label>
+                    <select name="tipo" id="movimiento_tipo" required onchange="cargarCategorias()"
+                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="INGRESO">Ingreso</option>
+                        <option value="EGRESO">Egreso</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Categoría *</label>
+                    <select name="categoria_id" id="movimiento_categoria" required
+                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Seleccione...</option>
+                        <?php 
+                        // Obtener categorías para el modal
+                        $categorias_modal = $db->query("SELECT * FROM finanzas_categorias WHERE activo = 1 ORDER BY tipo, nombre")->fetchAll();
+                        foreach ($categorias_modal as $cat): 
+                        ?>
+                            <option value="<?php echo $cat['id']; ?>" data-tipo="<?php echo $cat['tipo']; ?>">
+                                <?php echo e($cat['nombre']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Concepto *</label>
+                <input type="text" name="concepto" id="movimiento_concepto" required
+                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Descripción</label>
+                <textarea name="descripcion" id="movimiento_descripcion" rows="2"
+                          class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Monto * ($)</label>
+                    <input type="number" step="0.01" min="0" name="monto" id="movimiento_monto" required
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Fecha *</label>
+                    <input type="date" name="fecha_movimiento" id="movimiento_fecha" required
+                           value="<?php echo date('Y-m-d'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Método de Pago</label>
+                    <select name="metodo_pago" id="movimiento_metodo"
+                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Seleccione...</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Tarjeta">Tarjeta</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Referencia/Folio</label>
+                    <input type="text" name="referencia" id="movimiento_referencia"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Empresa (opcional)</label>
+                <input type="text" id="empresa_search" placeholder="Buscar empresa..."
+                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <input type="hidden" name="empresa_id" id="movimiento_empresa">
+                <div id="empresa_results" class="mt-2"></div>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">Notas</label>
+                <textarea name="notas" id="movimiento_notas" rows="2"
+                          class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-semibold mb-2">
+                    Evidencia / Comprobante *
+                    <span class="text-red-500 text-xs">(Obligatorio)</span>
+                </label>
+                <input type="file" name="evidencia" id="movimiento_evidencia" required
+                       accept="image/*,application/pdf,.doc,.docx"
+                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <p class="text-sm text-gray-500 mt-1">Formatos aceptados: JPG, PNG, PDF, DOC, DOCX (máx. 5MB)</p>
+                <div id="evidencia_preview" class="mt-2"></div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button type="button" onclick="cerrarModalMovimiento()" 
+                        class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                    Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function modalMovimiento() {
+    document.getElementById('modalMovTitle').textContent = 'Nuevo Movimiento';
+    document.getElementById('movimiento_id').value = '';
+    document.getElementById('movimiento_tipo').value = 'INGRESO';
+    document.getElementById('movimiento_categoria').value = '';
+    document.getElementById('movimiento_concepto').value = '';
+    document.getElementById('movimiento_descripcion').value = '';
+    document.getElementById('movimiento_monto').value = '';
+    document.getElementById('movimiento_fecha').value = '<?php echo date('Y-m-d'); ?>';
+    document.getElementById('movimiento_metodo').value = '';
+    document.getElementById('movimiento_referencia').value = '';
+    document.getElementById('movimiento_empresa').value = '';
+    document.getElementById('empresa_search').value = '';
+    document.getElementById('movimiento_notas').value = '';
+    
+    // Reset the required attribute on evidencia (it's only required for new movements)
+    document.getElementById('movimiento_evidencia').required = true;
+    
+    cargarCategorias();
+    document.getElementById('modalMovimiento').classList.remove('hidden');
+}
+
+function cerrarModalMovimiento() {
+    document.getElementById('modalMovimiento').classList.add('hidden');
+}
+
+function cargarCategorias() {
+    const tipo = document.getElementById('movimiento_tipo').value;
+    const select = document.getElementById('movimiento_categoria');
+    const options = select.querySelectorAll('option');
+    
+    options.forEach(opt => {
+        if (opt.value === '') {
+            opt.style.display = 'block';
+        } else if (opt.dataset.tipo === tipo) {
+            opt.style.display = 'block';
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+    
+    // Si la categoría seleccionada no es del tipo correcto, limpiar
+    const selectedOption = select.options[select.selectedIndex];
+    if (selectedOption && selectedOption.dataset.tipo && selectedOption.dataset.tipo !== tipo) {
+        select.value = '';
+    }
+}
+</script>
 
 <!-- Scripts de gráficas -->
 <script>

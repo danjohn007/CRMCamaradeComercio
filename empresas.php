@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'sector_id' => $_POST['sector_id'] ?? null,
         'categoria_id' => $_POST['categoria_id'] ?? null,
         'membresia_id' => $_POST['membresia_id'] ?? null,
-        'vendedor_id' => $_POST['vendedor_id'] ?? null,
+        'vendedor_id' => !empty($_POST['vendedor_id']) ? intval($_POST['vendedor_id']) : null,
         'tipo_afiliacion' => sanitize($_POST['tipo_afiliacion'] ?? ''),
         'fecha_renovacion' => $_POST['fecha_renovacion'] ?? null,
         'es_nueva' => isset($_POST['es_nueva']) ? 1 : 0,
@@ -158,7 +158,7 @@ if (in_array($action, ['new', 'edit'])) {
     $sectores = $db->query("SELECT * FROM sectores WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $categorias = $db->query("SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $membresias = $db->query("SELECT * FROM membresias WHERE activo = 1 ORDER BY nombre")->fetchAll();
-    $vendedores = $db->query("SELECT id, nombre FROM usuarios WHERE rol = 'AFILADOR' AND activo = 1 ORDER BY nombre")->fetchAll();
+    $vendedores = $db->query("SELECT id, nombre FROM vendedores WHERE activo = 1 ORDER BY nombre")->fetchAll();
     
     if ($action === 'edit' && $id) {
         $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
@@ -1019,16 +1019,21 @@ async function buscarEmpresaExistente(rfc) {
                     </div>
                 `;
                 
-                // Llenar campos automáticamente
+                // Llenar campos automáticamente - permitiendo edición
                 document.getElementById('razon_social').value = emp.razon_social || '';
                 document.querySelector('input[name="email"]').value = emp.email || '';
                 document.querySelector('input[name="telefono"]').value = emp.telefono || '';
                 document.querySelector('input[name="whatsapp"]').value = emp.whatsapp || '';
                 
-                // Los demás campos también se pueden llenar si están disponibles
+                // Llenar campos adicionales si están disponibles
                 if (emp.direccion_comercial) {
-                    const direccionField = document.querySelector('textarea[name="direccion_comercial"]');
-                    if (direccionField) direccionField.value = emp.direccion_comercial;
+                    document.querySelector('input[name="direccion_comercial"]').value = emp.direccion_comercial;
+                }
+                if (emp.ciudad) {
+                    document.querySelector('input[name="ciudad"]').value = emp.ciudad;
+                }
+                if (emp.estado) {
+                    document.querySelector('input[name="estado"]').value = emp.estado;
                 }
                 
             } else {
