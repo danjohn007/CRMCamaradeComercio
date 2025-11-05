@@ -134,16 +134,16 @@ try {
             VALUES (?, 'INGRESO', ?, 'Generado automáticamente desde Registrar Pago', ?, ?, ?, ?, ?, ?, 'PAGO', ?, ?)
         ");
         $stmt->execute([
-            $categoria_id,
-            $concepto,
-            $monto,
-            $fecha_pago,
-            $metodo_pago,
-            $referencia,
-            $empresa_id,
-            $user['id'],
-            $pago_id,
-            'PAGO_ID:' . $pago_id . ($notas ? ' - ' . $notas : '')
+            $categoria_id,        // categoria_id
+            $concepto,            // concepto
+            $monto,              // monto
+            $fecha_pago,         // fecha_movimiento
+            $metodo_pago,        // metodo_pago
+            $referencia,         // referencia
+            $empresa_id,         // empresa_id
+            $user['id'],         // usuario_id
+            $pago_id,            // pago_id
+            ($notas ? $notas : '') // notas
         ]);
     } catch (Exception $e) {
         // Log error with full context but don't fail the payment registration

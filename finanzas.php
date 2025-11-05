@@ -685,7 +685,7 @@ function modalMovimiento() {
     document.getElementById('movimiento_concepto').value = '';
     document.getElementById('movimiento_descripcion').value = '';
     document.getElementById('movimiento_monto').value = '';
-    document.getElementById('movimiento_fecha').value = '<?php echo date('Y-m-d'); ?>';
+    document.getElementById('movimiento_fecha').value = <?php echo json_encode(date('Y-m-d')); ?>;
     document.getElementById('movimiento_metodo').value = '';
     document.getElementById('movimiento_referencia').value = '';
     document.getElementById('movimiento_empresa').value = '';

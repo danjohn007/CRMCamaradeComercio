@@ -1026,14 +1026,19 @@ async function buscarEmpresaExistente(rfc) {
                 document.querySelector('input[name="whatsapp"]').value = emp.whatsapp || '';
                 
                 // Llenar campos adicionales si están disponibles
-                if (emp.direccion_comercial) {
-                    document.querySelector('input[name="direccion_comercial"]').value = emp.direccion_comercial;
+                const direccionField = document.querySelector('input[name="direccion_comercial"]');
+                if (direccionField && emp.direccion_comercial) {
+                    direccionField.value = emp.direccion_comercial;
                 }
-                if (emp.ciudad) {
-                    document.querySelector('input[name="ciudad"]').value = emp.ciudad;
+                
+                const ciudadField = document.querySelector('input[name="ciudad"]');
+                if (ciudadField && emp.ciudad) {
+                    ciudadField.value = emp.ciudad;
                 }
-                if (emp.estado) {
-                    document.querySelector('input[name="estado"]').value = emp.estado;
+                
+                const estadoField = document.querySelector('input[name="estado"]');
+                if (estadoField && emp.estado) {
+                    estadoField.value = emp.estado;
                 }
                 
             } else {
