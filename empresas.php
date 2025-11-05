@@ -168,7 +168,10 @@ if (in_array($action, ['new', 'edit'])) {
     $categorias = $db->query("SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $membresias = $db->query("SELECT * FROM membresias WHERE activo = 1 ORDER BY nombre")->fetchAll();
     // Cambio: Cargar usuarios con rol AFILADOR en lugar de tabla vendedores
-    $vendedores = $db->query("SELECT id, nombre FROM usuarios WHERE rol = 'AFILADOR' AND activo = 1 ORDER BY nombre")->fetchAll();
+    // Usar consulta preparada para prevenir SQL injection
+    $stmt = $db->prepare("SELECT id, nombre FROM usuarios WHERE rol = ? AND activo = 1 ORDER BY nombre");
+    $stmt->execute(['AFILADOR']);
+    $vendedores = $stmt->fetchAll();
     
     if ($action === 'edit' && $id) {
         $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");

@@ -64,11 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->beginTransaction();
                 
                 try {
-                    // Si existe una empresa con este RFC, actualizar sus datos
+                    // Si existe una empresa con este RFC, verificar que coincida y actualizar sus datos
                     if ($empresa_id_existente > 0) {
-                        $stmt = $db->prepare("UPDATE empresas SET razon_social = ?, email = ?, telefono = ?, whatsapp = ?, representante = ? WHERE id = ?");
-                        $stmt->execute([$razon_social, $email, $telefono, $whatsapp, $representante, $empresa_id_existente]);
-                        $empresa_id = $empresa_id_existente;
+                        // Verificar que el empresa_id corresponda al RFC proporcionado (prevenir manipulación)
+                        $stmt = $db->prepare("SELECT id FROM empresas WHERE id = ? AND rfc = ?");
+                        $stmt->execute([$empresa_id_existente, $rfc]);
+                        $empresa_verificada = $stmt->fetch();
+                        
+                        if ($empresa_verificada) {
+                            $stmt = $db->prepare("UPDATE empresas SET razon_social = ?, email = ?, telefono = ?, whatsapp = ?, representante = ? WHERE id = ? AND rfc = ?");
+                            $stmt->execute([$razon_social, $email, $telefono, $whatsapp, $representante, $empresa_id_existente, $rfc]);
+                            $empresa_id = $empresa_id_existente;
+                        } else {
+                            throw new Exception('Error de validación: empresa no corresponde al RFC proporcionado');
+                        }
                     } else {
                         // Crear nueva empresa si no existe
                         $stmt = $db->prepare("INSERT INTO empresas (rfc, razon_social, email, telefono, whatsapp, representante, activo, verificado) VALUES (?, ?, ?, ?, ?, ?, 1, 0)");
@@ -410,8 +419,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
-    // Función para buscar empresa por RFC
+    // Función para buscar empresa por RFC con rate limiting
     let buscarRFCTimeout;
+    let ultimaBusqueda = 0;
+    const MINIMO_INTERVALO = 1000; // Mínimo 1 segundo entre búsquedas
+    
     async function buscarEmpresaPorRFC(rfc) {
         clearTimeout(buscarRFCTimeout);
         const mensajeDiv = document.getElementById('rfc_mensaje');
@@ -423,11 +435,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return;
         }
         
-        // Esperar 500ms antes de buscar
+        // Esperar 800ms antes de buscar
         buscarRFCTimeout = setTimeout(async () => {
+            // Rate limiting en cliente
+            const ahora = Date.now();
+            if (ahora - ultimaBusqueda < MINIMO_INTERVALO) {
+                return; // Ignorar si es muy pronto
+            }
+            ultimaBusqueda = ahora;
+            
             try {
                 const response = await fetch('<?php echo BASE_URL; ?>/api/buscar_empresa_publico.php?rfc=' + encodeURIComponent(rfc));
+                
+                // Validar content type
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Respuesta inválida del servidor');
+                }
+                
                 const data = await response.json();
+                
+                if (response.status === 429) {
+                    mensajeDiv.innerHTML = `
+                        <div class="p-4 bg-orange-50 border-l-4 border-orange-500 rounded">
+                            <p class="text-sm text-orange-700">
+                                <i class="fas fa-exclamation-circle mr-2"></i>Demasiadas búsquedas. Espera un momento e intenta nuevamente.
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
                 
                 if (data.success && data.empresa) {
                     const emp = data.empresa;
@@ -445,12 +482,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Guardar ID de empresa existente
                     document.getElementById('empresa_id_existente').value = emp.id;
                     
-                    // Llenar campos automáticamente
-                    document.getElementById('razon_social').value = emp.razon_social || '';
-                    document.getElementById('email').value = emp.email || '';
-                    document.getElementById('telefono').value = emp.telefono || '';
-                    document.getElementById('whatsapp').value = emp.whatsapp || '';
-                    document.getElementById('representante').value = emp.representante || '';
+                    // Llenar campos automáticamente - sanitizar para prevenir XSS
+                    const sanitize = (str) => {
+                        const div = document.createElement('div');
+                        div.textContent = str || '';
+                        return div.innerHTML;
+                    };
+                    
+                    document.getElementById('razon_social').value = sanitize(emp.razon_social);
+                    document.getElementById('email').value = sanitize(emp.email);
+                    document.getElementById('telefono').value = sanitize(emp.telefono);
+                    document.getElementById('whatsapp').value = sanitize(emp.whatsapp);
+                    document.getElementById('representante').value = sanitize(emp.representante);
                     
                 } else {
                     // RFC no encontrado
@@ -468,12 +511,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mensajeDiv.innerHTML = `
                     <div class="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
                         <p class="text-sm text-yellow-700">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>Error al buscar empresa. Puedes continuar con el registro.
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Error de conexión. Puedes continuar con el registro manualmente.
                         </p>
                     </div>
                 `;
             }
-        }, 500);
+        }, 800);
     }
     </script>
 </body>
