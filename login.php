@@ -27,8 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch();
             
             if ($user) {
-                // Verificar bloqueo por intentos fallidos
-                if ($user['bloqueado_hasta'] && strtotime($user['bloqueado_hasta']) > time()) {
+                // Verificar si el email está verificado
+                if (!$user['email_verificado']) {
+                    $error = 'Verificación pendiente de tu correo. Por favor, revisa tu bandeja de entrada y spam para verificar tu email.';
+                } elseif ($user['bloqueado_hasta'] && strtotime($user['bloqueado_hasta']) > time()) {
+                    // Verificar bloqueo por intentos fallidos
                     $error = 'Cuenta temporalmente bloqueada. Intenta más tarde.';
                 } else {
                     // Verificar contraseña
@@ -77,7 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Verificar mensaje de éxito (ej: después de registro)
 if (isset($_GET['success'])) {
-    if ($_GET['success'] === 'registered') {
+    if ($_GET['success'] === 'verify_email') {
+        $success = 'Valida tu correo para entrar al sistema. Revisa tu bandeja de entrada y spam.';
+    } elseif ($_GET['success'] === 'registered') {
         $success = 'Registro exitoso. Por favor, inicia sesión.';
     }
 }

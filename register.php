@@ -104,8 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     sendEmail($email, 'Verifica tu email - ' . APP_NAME, $email_body);
                     
-                    // Redirigir a login con mensaje de éxito
-                    redirect('/login.php?success=registered');
+                    // Redirigir a login con mensaje de verificación de email
+                    redirect('/login.php?success=verify_email');
                 } catch (Exception $e) {
                     $db->rollBack();
                     throw $e;
