@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     $vendedor_id_value = null;
     if (!empty($_POST['vendedor_id'])) {
         $vid = intval($_POST['vendedor_id']);
-        $stmt_check = $db->prepare("SELECT id FROM vendedores WHERE id = ?");
+        $stmt_check = $db->prepare("SELECT 1 FROM vendedores WHERE id = ?");
         $stmt_check->execute([$vid]);
         if ($stmt_check->fetch()) {
             $vendedor_id_value = $vid;

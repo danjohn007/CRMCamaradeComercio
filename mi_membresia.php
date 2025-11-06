@@ -118,7 +118,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                             <p class="text-sm text-gray-600 mt-2">
                                 <?php echo $dias == 0 ? 'Vence hoy' : "Faltan $dias días"; ?>
                             </p>
-                        <?php elseif ($dias !== null && $dias < 0): ?>
+                        <?php elseif ($dias < 0): ?>
                             <p class="text-sm text-red-600 mt-2">
                                 Vencida hace <?php echo abs($dias); ?> días
                             </p>
