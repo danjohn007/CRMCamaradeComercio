@@ -134,7 +134,7 @@ if (empty($code)) {
                             <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
-                            <p class="text-red-700"><?php echo htmlspecialchars($error); ?></p>
+                            <p class="text-red-700"><?php echo e($error); ?></p>
                         </div>
                     </div>
                     <div class="text-center">
@@ -151,7 +151,7 @@ if (empty($code)) {
                             <svg class="w-6 h-6 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            <p class="text-green-700 font-semibold"><?php echo htmlspecialchars($success); ?></p>
+                            <p class="text-green-700 font-semibold"><?php echo e($success); ?></p>
                         </div>
                     </div>
                     <div class="text-center">
