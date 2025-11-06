@@ -96,23 +96,29 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </div>
                     
                     <div class="bg-gray-50 p-4 rounded-lg">
+                        <?php 
+                        // Calculate days once and reuse the value
+                        $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
+                        ?>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-700 font-semibold">Fecha de Renovación:</span>
                             <span class="font-bold <?php 
-                                $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
-                                echo $dias < 0 ? 'text-red-600' : ($dias <= 30 ? 'text-yellow-600' : 'text-green-600');
+                                if ($dias === null) {
+                                    echo 'text-gray-400';
+                                } else {
+                                    echo $dias < 0 ? 'text-red-600' : ($dias <= 30 ? 'text-yellow-600' : 'text-green-600');
+                                }
                             ?>">
                                 <?php echo formatDate($empresa['fecha_renovacion']); ?>
                             </span>
                         </div>
                         <?php 
-                        $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
-                        if ($dias >= 0):
+                        if ($dias !== null && $dias >= 0):
                         ?>
                             <p class="text-sm text-gray-600 mt-2">
                                 <?php echo $dias == 0 ? 'Vence hoy' : "Faltan $dias días"; ?>
                             </p>
-                        <?php else: ?>
+                        <?php elseif ($dias !== null && $dias < 0): ?>
                             <p class="text-sm text-red-600 mt-2">
                                 Vencida hace <?php echo abs($dias); ?> días
                             </p>
