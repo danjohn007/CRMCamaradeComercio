@@ -249,22 +249,3 @@ if (empty($codigo)) {
     <?php endif; ?>
 </body>
 </html>
-            </div>
-            
-            <!-- Información adicional (no se imprime) -->
-            <div class="no-print mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h3 class="font-bold text-blue-800 mb-2">
-                    <i class="fas fa-info-circle mr-2"></i>Instrucciones
-                </h3>
-                <ul class="text-sm text-gray-700 space-y-1 list-disc list-inside">
-                    <li>Imprime este boleto o guárdalo en tu dispositivo móvil</li>
-                    <li>Llega con 15 minutos de anticipación</li>
-                    <li>Presenta tu código QR en la entrada del evento</li>
-                    <li>Si tienes problemas, contacta al organizador</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-</body>
-</html>
