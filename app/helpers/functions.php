@@ -194,6 +194,11 @@ function generateVerificationCode() {
  * Calcular días hasta vencimiento
  */
 function diasHastaVencimiento($fecha) {
+    // Return null if fecha is null or empty to avoid DateTime deprecation warning
+    if (empty($fecha)) {
+        return null;
+    }
+    
     $hoy = new DateTime();
     $vencimiento = new DateTime($fecha);
     $diff = $hoy->diff($vencimiento);

@@ -4,13 +4,15 @@
  * Usado en el registro público de empresas
  * Incluye protección contra abuso mediante rate limiting básico
  */
+// Start session first before any output
+session_start();
+
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 
 // Rate limiting básico por sesión
-session_start();
 $now = time();
 $limit_window = 60; // 60 segundos
 $max_requests = 10; // máximo 10 búsquedas por minuto

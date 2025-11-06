@@ -235,7 +235,14 @@ include __DIR__ . '/app/views/layouts/header.php';
                             </div>
                             <div class="text-right">
                                 <p class="text-sm font-semibold text-gray-800"><?php echo formatMoney($empresa['costo']); ?></p>
-                                <span class="text-xs text-yellow-600"><?php echo diasHastaVencimiento($empresa['fecha_renovacion']); ?> días</span>
+                                <?php 
+                                $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
+                                if ($dias !== null): 
+                                ?>
+                                    <span class="text-xs text-yellow-600"><?php echo $dias; ?> días</span>
+                                <?php else: ?>
+                                    <span class="text-xs text-gray-400">Sin fecha</span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>

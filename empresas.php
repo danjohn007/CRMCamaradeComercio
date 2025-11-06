@@ -67,6 +67,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     $es_nueva = ($afiliacion_tipo === 'nueva') ? 1 : 0;
     $es_actualizacion = ($afiliacion_tipo === 'actualizacion') ? 1 : 0;
     
+    // Validate vendedor_id exists in vendedores table to avoid foreign key constraint error
+    // Form uses usuarios table but database constraint requires vendedores table
+    $vendedor_id_value = null;
+    if (!empty($_POST['vendedor_id'])) {
+        $vid = intval($_POST['vendedor_id']);
+        $stmt_check = $db->prepare("SELECT id FROM vendedores WHERE id = ?");
+        $stmt_check->execute([$vid]);
+        if ($stmt_check->fetch()) {
+            $vendedor_id_value = $vid;
+        }
+    }
+    
     $data = [
         'razon_social' => sanitize($_POST['razon_social'] ?? ''),
         'rfc' => strtoupper(sanitize($_POST['rfc'] ?? '')),
@@ -84,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'sector_id' => $_POST['sector_id'] ?? null,
         'categoria_id' => $_POST['categoria_id'] ?? null,
         'membresia_id' => $_POST['membresia_id'] ?? null,
-        'vendedor_id' => !empty($_POST['vendedor_id']) ? intval($_POST['vendedor_id']) : null,
+        'vendedor_id' => $vendedor_id_value,
         'tipo_afiliacion' => $tipo_afiliacion_select,
         'fecha_renovacion' => $_POST['fecha_renovacion'] ?? null,
         'es_nueva' => $es_nueva,
@@ -338,10 +350,14 @@ include __DIR__ . '/app/views/layouts/header.php';
                     <td class="px-6 py-4 text-sm">
                         <?php 
                         $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
-                        $color = $dias < 0 ? 'red' : ($dias <= 30 ? 'yellow' : 'green');
+                        if ($dias !== null) {
+                            $color = $dias < 0 ? 'red' : ($dias <= 30 ? 'yellow' : 'green');
+                        } else {
+                            $color = 'gray';
+                        }
                         ?>
                         <span class="px-2 py-1 text-xs rounded bg-<?php echo $color; ?>-100 text-<?php echo $color; ?>-800">
-                            <?php echo formatDate($empresa['fecha_renovacion']); ?>
+                            <?php echo formatDate($empresa['fecha_renovacion']) ?: 'Sin fecha'; ?>
                         </span>
                     </td>
                     <td class="px-6 py-4 text-sm">
