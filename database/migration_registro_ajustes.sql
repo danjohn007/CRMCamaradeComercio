@@ -4,13 +4,14 @@
 
 -- 1. Agregar campo colonia_fiscal a la tabla empresas
 -- Este campo diferenciará la colonia de dirección fiscal de la comercial
-ALTER TABLE empresas 
-ADD COLUMN colonia_fiscal VARCHAR(100) AFTER colonia
-COMMENT 'Colonia de la dirección fiscal';
+ALTER TABLE empresas
+  ADD COLUMN colonia_fiscal VARCHAR(100)
+    COMMENT 'Colonia de la dirección fiscal'
+    AFTER colonia;
 
 -- 2. Actualizar comentario del campo colonia existente para indicar que es para dirección comercial
-ALTER TABLE empresas 
-MODIFY COLUMN colonia VARCHAR(100) COMMENT 'Colonia de la dirección comercial';
+ALTER TABLE empresas
+  MODIFY COLUMN colonia VARCHAR(100) COMMENT 'Colonia de la dirección comercial';
 
 -- 3. Modificar tipo de afiliación para normalizar valores
 -- Nota: El campo ya existe como VARCHAR(100), lo usaremos con valores predefinidos: SIEM o MEMBRESÍA
