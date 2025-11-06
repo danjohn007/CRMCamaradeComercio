@@ -9,13 +9,19 @@ require_once __DIR__ . '/config/database.php';
 $error = '';
 $success = '';
 $code = $_GET['code'] ?? '';
+$db = null;
+
+// Intentar obtener conexión a la base de datos
+try {
+    $db = Database::getInstance()->getConnection();
+} catch (Exception $e) {
+    $error = 'Error de conexión a la base de datos.';
+}
 
 if (empty($code)) {
     $error = 'Código de verificación no proporcionado.';
-} else {
+} elseif ($db) {
     try {
-        $db = Database::getInstance()->getConnection();
-        
         // Buscar usuario con este código de verificación
         $stmt = $db->prepare("SELECT id, email, email_verificado FROM usuarios WHERE codigo_verificacion = ?");
         $stmt->execute([$code]);
@@ -48,17 +54,18 @@ if (empty($code)) {
     // Cargar colores personalizados
     $color_primario = '#1E40AF';
     $color_secundario = '#10B981';
-    try {
-        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario')");
-        $custom_colors = [];
-        while ($row = $stmt->fetch()) {
-            $custom_colors[$row['clave']] = $row['valor'];
+    if ($db) {
+        try {
+            $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario')");
+            $custom_colors = [];
+            while ($row = $stmt->fetch()) {
+                $custom_colors[$row['clave']] = $row['valor'];
+            }
+            $color_primario = $custom_colors['color_primario'] ?? '#1E40AF';
+            $color_secundario = $custom_colors['color_secundario'] ?? '#10B981';
+        } catch (Exception $e) {
+            // Use defaults
         }
-        $color_primario = $custom_colors['color_primario'] ?? '#1E40AF';
-        $color_secundario = $custom_colors['color_secundario'] ?? '#10B981';
-    } catch (Exception $e) {
-        $color_primario = '#1E40AF';
-        $color_secundario = '#10B981';
     }
     ?>
     <style>
@@ -90,16 +97,18 @@ if (empty($code)) {
                 // Obtener logo del sistema desde configuración
                 $logo_sistema = '';
                 $nombre_sitio = APP_NAME;
-                try {
-                    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('logo_sistema', 'nombre_sitio')");
-                    while ($row = $stmt->fetch()) {
-                        if ($row['clave'] === 'logo_sistema') {
-                            $logo_sistema = $row['valor'];
-                        } elseif ($row['clave'] === 'nombre_sitio' && !empty($row['valor'])) {
-                            $nombre_sitio = $row['valor'];
+                if ($db) {
+                    try {
+                        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('logo_sistema', 'nombre_sitio')");
+                        while ($row = $stmt->fetch()) {
+                            if ($row['clave'] === 'logo_sistema') {
+                                $logo_sistema = $row['valor'];
+                            } elseif ($row['clave'] === 'nombre_sitio' && !empty($row['valor'])) {
+                                $nombre_sitio = $row['valor'];
+                            }
                         }
-                    }
-                } catch (Exception $e) {}
+                    } catch (Exception $e) {}
+                }
                 
                 if (!empty($logo_sistema) && file_exists(ROOT_PATH . $logo_sistema)):
                 ?>
