@@ -46,8 +46,9 @@ if (empty($code)) {
     <script src="https://cdn.tailwindcss.com"></script>
     <?php
     // Cargar colores personalizados
+    $color_primario = '#1E40AF';
+    $color_secundario = '#10B981';
     try {
-        $db = Database::getInstance()->getConnection();
         $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario')");
         $custom_colors = [];
         while ($row = $stmt->fetch()) {
