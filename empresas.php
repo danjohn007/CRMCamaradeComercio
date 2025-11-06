@@ -68,7 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     $es_actualizacion = ($afiliacion_tipo === 'actualizacion') ? 1 : 0;
     
     // Validate vendedor_id exists in vendedores table to avoid foreign key constraint error
-    // Form uses usuarios table but database constraint requires vendedores table
+    // WORKAROUND: Form loads users with AFILADOR role from usuarios table (line 172-174),
+    // but the database foreign key constraint requires vendedores.id
+    // TODO: Align schema by either updating FK to usuarios or syncing vendedores with usuarios
     $vendedor_id_value = null;
     if (!empty($_POST['vendedor_id'])) {
         $vid = intval($_POST['vendedor_id']);
