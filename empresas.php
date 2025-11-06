@@ -59,6 +59,14 @@ if ($action === 'activate' && $id) {
 
 // Procesar formulario de nueva empresa o edición
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit'])) {
+    // Procesar tipo de afiliación desde select
+    $tipo_afiliacion_select = sanitize($_POST['tipo_afiliacion_select'] ?? '');
+    
+    // Procesar Nueva Afiliación / Actualización desde select
+    $afiliacion_tipo = sanitize($_POST['afiliacion_tipo'] ?? '');
+    $es_nueva = ($afiliacion_tipo === 'nueva') ? 1 : 0;
+    $es_actualizacion = ($afiliacion_tipo === 'actualizacion') ? 1 : 0;
+    
     $data = [
         'razon_social' => sanitize($_POST['razon_social'] ?? ''),
         'rfc' => strtoupper(sanitize($_POST['rfc'] ?? '')),
@@ -69,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'direccion_comercial' => sanitize($_POST['direccion_comercial'] ?? ''),
         'direccion_fiscal' => sanitize($_POST['direccion_fiscal'] ?? ''),
         'colonia' => sanitize($_POST['colonia'] ?? ''),
+        'colonia_fiscal' => sanitize($_POST['colonia_fiscal'] ?? ''),
         'ciudad' => sanitize($_POST['ciudad'] ?? ''),
         'codigo_postal' => sanitize($_POST['codigo_postal'] ?? ''),
         'estado' => sanitize($_POST['estado'] ?? 'Querétaro'),
@@ -76,10 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'categoria_id' => $_POST['categoria_id'] ?? null,
         'membresia_id' => $_POST['membresia_id'] ?? null,
         'vendedor_id' => !empty($_POST['vendedor_id']) ? intval($_POST['vendedor_id']) : null,
-        'tipo_afiliacion' => sanitize($_POST['tipo_afiliacion'] ?? ''),
+        'tipo_afiliacion' => $tipo_afiliacion_select,
         'fecha_renovacion' => $_POST['fecha_renovacion'] ?? null,
-        'es_nueva' => isset($_POST['es_nueva']) ? 1 : 0,
-        'es_actualizacion' => isset($_POST['es_actualizacion']) ? 1 : 0,
+        'es_nueva' => $es_nueva,
+        'es_actualizacion' => $es_actualizacion,
         'descripcion' => sanitize($_POST['descripcion'] ?? ''),
         'servicios_productos' => sanitize($_POST['servicios_productos'] ?? ''),
         'palabras_clave' => sanitize($_POST['palabras_clave'] ?? ''),
@@ -96,17 +105,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $data['fecha_recibo'] = date('Y-m-d');
             
             $sql = "INSERT INTO empresas (no_registro, no_mes, fecha_recibo, razon_social, rfc, email, telefono, whatsapp, 
-                    representante, direccion_comercial, direccion_fiscal, colonia, ciudad, codigo_postal, estado, 
+                    representante, direccion_comercial, direccion_fiscal, colonia, colonia_fiscal, ciudad, codigo_postal, estado, 
                     sector_id, categoria_id, membresia_id, vendedor_id, tipo_afiliacion, fecha_renovacion, 
                     es_nueva, es_actualizacion, descripcion, servicios_productos, palabras_clave, sitio_web) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 $data['no_registro'], $data['no_mes'], $data['fecha_recibo'],
                 $data['razon_social'], $data['rfc'], $data['email'], $data['telefono'], $data['whatsapp'],
                 $data['representante'], $data['direccion_comercial'], $data['direccion_fiscal'],
-                $data['colonia'], $data['ciudad'], $data['codigo_postal'], $data['estado'],
+                $data['colonia'], $data['colonia_fiscal'], $data['ciudad'], $data['codigo_postal'], $data['estado'],
                 $data['sector_id'], $data['categoria_id'], $data['membresia_id'], $data['vendedor_id'],
                 $data['tipo_afiliacion'], $data['fecha_renovacion'], $data['es_nueva'], $data['es_actualizacion'],
                 $data['descripcion'], $data['servicios_productos'], $data['palabras_clave'], $data['sitio_web']
@@ -123,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         } else {
             // Editar empresa existente
             $sql = "UPDATE empresas SET razon_social = ?, rfc = ?, email = ?, telefono = ?, whatsapp = ?, 
-                    representante = ?, direccion_comercial = ?, direccion_fiscal = ?, colonia = ?, ciudad = ?, 
+                    representante = ?, direccion_comercial = ?, direccion_fiscal = ?, colonia = ?, colonia_fiscal = ?, ciudad = ?, 
                     codigo_postal = ?, estado = ?, sector_id = ?, categoria_id = ?, membresia_id = ?, 
                     vendedor_id = ?, tipo_afiliacion = ?, fecha_renovacion = ?, es_nueva = ?, es_actualizacion = ?,
                     descripcion = ?, servicios_productos = ?, palabras_clave = ?, sitio_web = ?
@@ -133,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $stmt->execute([
                 $data['razon_social'], $data['rfc'], $data['email'], $data['telefono'], $data['whatsapp'],
                 $data['representante'], $data['direccion_comercial'], $data['direccion_fiscal'],
-                $data['colonia'], $data['ciudad'], $data['codigo_postal'], $data['estado'],
+                $data['colonia'], $data['colonia_fiscal'], $data['ciudad'], $data['codigo_postal'], $data['estado'],
                 $data['sector_id'], $data['categoria_id'], $data['membresia_id'], $data['vendedor_id'],
                 $data['tipo_afiliacion'], $data['fecha_renovacion'], $data['es_nueva'], $data['es_actualizacion'],
                 $data['descripcion'], $data['servicios_productos'], $data['palabras_clave'], $data['sitio_web'],
@@ -158,7 +167,11 @@ if (in_array($action, ['new', 'edit'])) {
     $sectores = $db->query("SELECT * FROM sectores WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $categorias = $db->query("SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre")->fetchAll();
     $membresias = $db->query("SELECT * FROM membresias WHERE activo = 1 ORDER BY nombre")->fetchAll();
-    $vendedores = $db->query("SELECT id, nombre FROM vendedores WHERE activo = 1 ORDER BY nombre")->fetchAll();
+    // Cambio: Cargar usuarios con rol AFILADOR en lugar de tabla vendedores
+    // Usar consulta preparada para prevenir SQL injection
+    $stmt = $db->prepare("SELECT id, nombre FROM usuarios WHERE rol = ? AND activo = 1 ORDER BY nombre");
+    $stmt->execute(['AFILADOR']);
+    $vendedores = $stmt->fetchAll();
     
     if ($action === 'edit' && $id) {
         $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
@@ -511,9 +524,11 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <!-- Tipo de Afiliación -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Tipo de Afiliación</label>
-                    <input type="text" name="tipo_afiliacion"
-                           value="<?php echo e($empresa['tipo_afiliacion'] ?? ''); ?>"
-                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <select name="tipo_afiliacion_select" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Seleccionar...</option>
+                        <option value="SIEM" <?php echo ($empresa['tipo_afiliacion'] ?? '') == 'SIEM' ? 'selected' : ''; ?>>SIEM</option>
+                        <option value="MEMBRESÍA" <?php echo ($empresa['tipo_afiliacion'] ?? '') == 'MEMBRESÍA' ? 'selected' : ''; ?>>MEMBRESÍA</option>
+                    </select>
                 </div>
 
                 <!-- Fecha de Renovación -->
@@ -532,6 +547,14 @@ include __DIR__ . '/app/views/layouts/header.php';
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
 
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Colonia (Dirección Comercial)</label>
+                    <input type="text" name="colonia"
+                           value="<?php echo e($empresa['colonia'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="Colonia de dirección comercial">
+                </div>
+
                 <div class="md:col-span-2">
                     <label class="block text-gray-700 font-semibold mb-2">Dirección Fiscal</label>
                     <input type="text" name="direccion_fiscal"
@@ -540,10 +563,11 @@ include __DIR__ . '/app/views/layouts/header.php';
                 </div>
 
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Colonia</label>
-                    <input type="text" name="colonia"
-                           value="<?php echo e($empresa['colonia'] ?? ''); ?>"
-                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-gray-700 font-semibold mb-2">Colonia (Dirección Fiscal)</label>
+                    <input type="text" name="colonia_fiscal"
+                           value="<?php echo e($empresa['colonia_fiscal'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="Colonia de dirección fiscal">
                 </div>
 
                 <div>
@@ -567,20 +591,24 @@ include __DIR__ . '/app/views/layouts/header.php';
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
 
-                <!-- Checkboxes -->
-                <div class="md:col-span-2 flex space-x-6">
-                    <label class="flex items-center">
-                        <input type="checkbox" name="es_nueva" value="1"
-                               <?php echo ($empresa['es_nueva'] ?? 0) ? 'checked' : ''; ?>
-                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                        <span class="ml-2 text-gray-700">Nueva Afiliación</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" name="es_actualizacion" value="1"
-                               <?php echo ($empresa['es_actualizacion'] ?? 0) ? 'checked' : ''; ?>
-                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                        <span class="ml-2 text-gray-700">Actualización</span>
-                    </label>
+                <!-- Tipo de Registro: Nueva Afiliación / Actualización -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Tipo de Registro</label>
+                    <select name="afiliacion_tipo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Seleccionar...</option>
+                        <?php 
+                        $selected_tipo = '';
+                        if (isset($empresa)) {
+                            if ($empresa['es_nueva'] ?? 0) {
+                                $selected_tipo = 'nueva';
+                            } elseif ($empresa['es_actualizacion'] ?? 0) {
+                                $selected_tipo = 'actualizacion';
+                            }
+                        }
+                        ?>
+                        <option value="nueva" <?php echo $selected_tipo == 'nueva' ? 'selected' : ''; ?>>Nueva Afiliación</option>
+                        <option value="actualizacion" <?php echo $selected_tipo == 'actualizacion' ? 'selected' : ''; ?>>Actualización</option>
+                    </select>
                 </div>
 
                 <!-- Sección de Información Adicional -->
