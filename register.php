@@ -264,6 +264,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             >
                         </div>
 
+                        <!-- Teléfono -->
+                        <div>
+                            <label for="telefono" class="block text-gray-700 font-semibold mb-2">
+                                Teléfono
+                            </label>
+                            <input 
+                                type="tel" 
+                                id="telefono" 
+                                name="telefono" 
+                                maxlength="10"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="4421234567"
+                                value="<?php echo htmlspecialchars($telefono ?? ''); ?>"
+                            >
+                            <p class="text-xs text-gray-500 mt-1">10 dígitos sin espacios</p>
+                        </div>
+
                         <!-- WhatsApp -->
                         <div>
                             <label for="whatsapp" class="block text-gray-700 font-semibold mb-2">

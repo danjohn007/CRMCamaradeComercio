@@ -427,8 +427,11 @@ include __DIR__ . '/app/views/layouts/header.php';
                                 <?php endif; ?>
                             </label>
                             <input type="tel" name="telefono"
+                                   maxlength="10"
                                    value="<?php echo e($empresa['telefono']); ?>"
-                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                                   placeholder="10 dígitos">
+                            <p class="text-xs text-gray-500 mt-1">10 dígitos sin espacios</p>
                         </div>
                         
                         <div>
@@ -439,8 +442,11 @@ include __DIR__ . '/app/views/layouts/header.php';
                                 <?php endif; ?>
                             </label>
                             <input type="tel" name="whatsapp"
+                                   maxlength="10"
                                    value="<?php echo e($empresa['whatsapp']); ?>"
-                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                                   placeholder="10 dígitos">
+                            <p class="text-xs text-gray-500 mt-1">10 dígitos sin espacios</p>
                         </div>
                         
                         <div>

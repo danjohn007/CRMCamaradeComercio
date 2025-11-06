@@ -462,17 +462,23 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <!-- Teléfono -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Teléfono</label>
-                    <input type="text" name="telefono"
+                    <input type="tel" name="telefono"
+                           maxlength="10"
                            value="<?php echo e($empresa['telefono'] ?? ''); ?>"
-                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="10 dígitos">
+                    <p class="text-xs text-gray-500 mt-1">10 dígitos sin espacios</p>
                 </div>
 
                 <!-- WhatsApp -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">WhatsApp</label>
-                    <input type="text" name="whatsapp"
+                    <input type="tel" name="whatsapp"
+                           maxlength="10"
                            value="<?php echo e($empresa['whatsapp'] ?? ''); ?>"
-                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="10 dígitos">
+                    <p class="text-xs text-gray-500 mt-1">10 dígitos sin espacios</p>
                 </div>
 
                 <!-- Representante -->
