@@ -141,6 +141,9 @@ try {
         $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
         
+        // Preparar datos para auditoría
+        // NOTA: Los datos de empresa y membresía vienen de la BD (ya validados y sanitizados)
+        // No provienen de input del usuario, por lo que son confiables
         $datos_auditoria = json_encode([
             'empresa_id' => $empresa_id,
             'razon_social' => $empresa['razon_social'],
@@ -151,7 +154,7 @@ try {
             'vigencia_meses' => $vigencia_meses,
             'fecha_renovacion_nueva' => date('Y-m-d', strtotime("+{$vigencia_meses} months")),
             'accion_origen' => 'update_membresia_form'
-        ]);
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         
         $stmt = $db->prepare("
             INSERT INTO auditoria 

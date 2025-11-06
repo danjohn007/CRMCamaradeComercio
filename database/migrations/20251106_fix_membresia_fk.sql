@@ -1,6 +1,6 @@
 -- =====================================================================================
 -- Migración: Fix Foreign Key Violation - Membresía ID
--- Fecha: 2025-11-06
+-- Fecha: 2024-11-06
 -- Descripción: Esta migración crea triggers temporales para prevenir errores SQL 1452
 --              cuando se intenta guardar empresas con membresia_id que no existe en la
 --              tabla membresias. Los triggers establecen membresia_id = NULL si el valor

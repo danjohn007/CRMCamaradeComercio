@@ -1,7 +1,7 @@
 # Instrucciones de Migración y Verificación
 ## Fix SQL Error 1452 y Funcionalidad de Actualización de Membresía
 
-**Fecha:** 06 de Noviembre de 2025  
+**Fecha:** 06 de Noviembre de 2024  
 **Versión de Migración:** 20251106_fix_membresia_fk.sql
 
 ---

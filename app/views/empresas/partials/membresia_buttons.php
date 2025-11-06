@@ -66,14 +66,16 @@ if (!isset($GLOBALS['membresia_buttons_script_included'])):
 <script>
 /**
  * Función para confirmar la actualización de membresía
- * @param {string} nombreMembresia - Nombre de la membresía a actualizar
+ * @param {string} nombreMembresia - Nombre de la membresía a actualizar (debe estar escaped en PHP)
  * @param {number} costo - Costo de la membresía
  * @returns {boolean} - true si el usuario confirma, false si cancela
  */
 function confirmarActualizacionMembresia(nombreMembresia, costo) {
-    const mensaje = `¿Está seguro que desea actualizar su membresía a "${nombreMembresia}"?\n\n` +
-                    `Costo: $${parseFloat(costo).toFixed(2)}\n\n` +
-                    `Esta acción actualizará su plan y fecha de renovación.`;
+    // nombreMembresia ya viene escapado desde PHP con addslashes()
+    // parseFloat previene inyección en el valor numérico
+    const mensaje = '¿Está seguro que desea actualizar su membresía a "' + nombreMembresia + '"?\n\n' +
+                    'Costo: $' + parseFloat(costo).toFixed(2) + '\n\n' +
+                    'Esta acción actualizará su plan y fecha de renovación.';
     
     return confirm(mensaje);
 }
