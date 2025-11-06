@@ -96,10 +96,13 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </div>
                     
                     <div class="bg-gray-50 p-4 rounded-lg">
+                        <?php 
+                        // Calculate days once and reuse the value
+                        $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
+                        ?>
                         <div class="flex justify-between items-center">
                             <span class="text-gray-700 font-semibold">Fecha de Renovación:</span>
                             <span class="font-bold <?php 
-                                $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
                                 if ($dias === null) {
                                     echo 'text-gray-400';
                                 } else {
@@ -110,7 +113,6 @@ include __DIR__ . '/app/views/layouts/header.php';
                             </span>
                         </div>
                         <?php 
-                        $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
                         if ($dias !== null && $dias >= 0):
                         ?>
                             <p class="text-sm text-gray-600 mt-2">
