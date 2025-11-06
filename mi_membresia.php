@@ -151,7 +151,7 @@ include __DIR__ . '/app/views/layouts/header.php';
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <?php foreach ($membresias_superiores as $membresia): 
-                    $es_actual = (intval($empresa['membresia_id']) === intval($membresia['id']));
+                    $es_actual = ($empresa['membresia_id'] !== null && intval($empresa['membresia_id']) === intval($membresia['id']));
                 ?>
                 <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden <?php echo $es_actual ? 'ring-2 ring-green-500' : ''; ?>">
                     <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white <?php echo $es_actual ? 'relative' : ''; ?>">

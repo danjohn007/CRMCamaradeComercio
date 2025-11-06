@@ -88,7 +88,7 @@ try {
     }
     
     // Verificar que no sea la misma membresía actual
-    if (intval($nueva_membresia['id']) === intval($empresa['membresia_actual_id'])) {
+    if ($empresa['membresia_actual_id'] !== null && intval($nueva_membresia['id']) === intval($empresa['membresia_actual_id'])) {
         throw new Exception('Ya tienes esta membresía activa');
     }
     
