@@ -32,14 +32,27 @@ if (!$user['empresa_id']) {
     $stmt->execute([$user['empresa_id']]);
     $empresa = $stmt->fetch();
     
-    // Obtener membresías superiores disponibles
-    $stmt = $db->prepare("
-        SELECT * FROM membresias 
-        WHERE activo = 1 
-        AND nivel_orden > ?
-        ORDER BY nivel_orden ASC
-    ");
-    $stmt->execute([$empresa['membresia_nivel'] ?? 0]);
+    // Obtener membresías superiores disponibles (o todas si no tiene membresía)
+    $nivel_actual = $empresa['membresia_nivel'] ?? 0;
+    
+    // Si no tiene membresía actual, mostrar todas las membresías activas
+    if ($nivel_actual == 0 || empty($empresa['membresia_id'])) {
+        $stmt = $db->prepare("
+            SELECT * FROM membresias 
+            WHERE activo = 1 
+            ORDER BY nivel_orden ASC
+        ");
+        $stmt->execute();
+    } else {
+        // Si ya tiene membresía, mostrar solo las superiores
+        $stmt = $db->prepare("
+            SELECT * FROM membresias 
+            WHERE activo = 1 
+            AND nivel_orden > ?
+            ORDER BY nivel_orden ASC
+        ");
+        $stmt->execute([$nivel_actual]);
+    }
     $membresias_superiores = $stmt->fetchAll();
 }
 
