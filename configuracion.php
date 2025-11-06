@@ -62,6 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'max_boletos_por_registro' => intval($_POST['max_boletos_por_registro'] ?? 10),
             'color_primario' => sanitize($_POST['color_primario'] ?? '#1E40AF'),
             'color_secundario' => sanitize($_POST['color_secundario'] ?? '#10B981'),
+            'color_terciario' => sanitize($_POST['color_terciario'] ?? '#6366F1'),
+            'color_acento1' => sanitize($_POST['color_acento1'] ?? '#F59E0B'),
+            'color_acento2' => sanitize($_POST['color_acento2'] ?? '#EC4899'),
+            'color_header' => sanitize($_POST['color_header'] ?? '#1E40AF'),
+            'color_sidebar' => sanitize($_POST['color_sidebar'] ?? '#1F2937'),
+            'color_footer' => sanitize($_POST['color_footer'] ?? '#111827'),
             'terminos_condiciones' => $_POST['terminos_condiciones'] ?? '',
             'politica_privacidad' => $_POST['politica_privacidad'] ?? '',
             'logo_sistema' => $logo_path,
@@ -297,7 +303,8 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <i class="fas fa-palette mr-2"></i>Personalización de Diseño
             </h2>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h3 class="text-md font-semibold text-gray-700 mb-4">Colores Principales</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Color Primario</label>
                     <div class="flex gap-2">
@@ -325,13 +332,100 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </div>
                     <p class="text-sm text-gray-500 mt-1">Color para elementos secundarios y acentos</p>
                 </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Color Terciario</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="color_terciario" id="color_terciario"
+                               value="<?php echo e($config['color_terciario'] ?? '#6366F1'); ?>"
+                               class="w-16 h-10 border rounded cursor-pointer">
+                        <input type="text" id="color_terciario_text"
+                               value="<?php echo e($config['color_terciario'] ?? '#6366F1'); ?>"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+                               readonly>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Color terciario para elementos complementarios</p>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Color Acento 1</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="color_acento1" id="color_acento1"
+                               value="<?php echo e($config['color_acento1'] ?? '#F59E0B'); ?>"
+                               class="w-16 h-10 border rounded cursor-pointer">
+                        <input type="text" id="color_acento1_text"
+                               value="<?php echo e($config['color_acento1'] ?? '#F59E0B'); ?>"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+                               readonly>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Primer color de acento para destacar</p>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Color Acento 2</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="color_acento2" id="color_acento2"
+                               value="<?php echo e($config['color_acento2'] ?? '#EC4899'); ?>"
+                               class="w-16 h-10 border rounded cursor-pointer">
+                        <input type="text" id="color_acento2_text"
+                               value="<?php echo e($config['color_acento2'] ?? '#EC4899'); ?>"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+                               readonly>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Segundo color de acento para elementos especiales</p>
+                </div>
+            </div>
+
+            <h3 class="text-md font-semibold text-gray-700 mb-4 mt-6 border-t pt-4">Colores por Sección</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Color Header (Top)</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="color_header" id="color_header"
+                               value="<?php echo e($config['color_header'] ?? '#1E40AF'); ?>"
+                               class="w-16 h-10 border rounded cursor-pointer">
+                        <input type="text" id="color_header_text"
+                               value="<?php echo e($config['color_header'] ?? '#1E40AF'); ?>"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+                               readonly>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Color del encabezado superior</p>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Color Sidebar</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="color_sidebar" id="color_sidebar"
+                               value="<?php echo e($config['color_sidebar'] ?? '#1F2937'); ?>"
+                               class="w-16 h-10 border rounded cursor-pointer">
+                        <input type="text" id="color_sidebar_text"
+                               value="<?php echo e($config['color_sidebar'] ?? '#1F2937'); ?>"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+                               readonly>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Color de la barra lateral</p>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Color Footer (Bottom)</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="color_footer" id="color_footer"
+                               value="<?php echo e($config['color_footer'] ?? '#111827'); ?>"
+                               class="w-16 h-10 border rounded cursor-pointer">
+                        <input type="text" id="color_footer_text"
+                               value="<?php echo e($config['color_footer'] ?? '#111827'); ?>"
+                               class="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+                               readonly>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Color del pie de página</p>
+                </div>
             </div>
 
             <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p class="text-sm text-blue-800">
                     <i class="fas fa-info-circle mr-2"></i>
                     <strong>Nota:</strong> Los colores personalizados se aplicarán mediante CSS en el sistema. 
-                    Guarda la configuración para ver los cambios.
+                    Guarda la configuración para ver los cambios en toda la aplicación.
                 </p>
             </div>
         </div>
@@ -513,6 +607,30 @@ document.getElementById('color_primario')?.addEventListener('input', function(e)
 
 document.getElementById('color_secundario')?.addEventListener('input', function(e) {
     document.getElementById('color_secundario_text').value = e.target.value;
+});
+
+document.getElementById('color_terciario')?.addEventListener('input', function(e) {
+    document.getElementById('color_terciario_text').value = e.target.value;
+});
+
+document.getElementById('color_acento1')?.addEventListener('input', function(e) {
+    document.getElementById('color_acento1_text').value = e.target.value;
+});
+
+document.getElementById('color_acento2')?.addEventListener('input', function(e) {
+    document.getElementById('color_acento2_text').value = e.target.value;
+});
+
+document.getElementById('color_header')?.addEventListener('input', function(e) {
+    document.getElementById('color_header_text').value = e.target.value;
+});
+
+document.getElementById('color_sidebar')?.addEventListener('input', function(e) {
+    document.getElementById('color_sidebar_text').value = e.target.value;
+});
+
+document.getElementById('color_footer')?.addEventListener('input', function(e) {
+    document.getElementById('color_footer_text').value = e.target.value;
 });
 </script>
 

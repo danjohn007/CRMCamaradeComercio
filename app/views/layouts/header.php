@@ -17,16 +17,28 @@ $user = getCurrentUser();
     // Cargar colores personalizados
     try {
         $db = Database::getInstance()->getConnection();
-        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario')");
+        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario', 'color_terciario', 'color_acento1', 'color_acento2', 'color_header', 'color_sidebar', 'color_footer')");
         $custom_colors = [];
         while ($row = $stmt->fetch()) {
             $custom_colors[$row['clave']] = $row['valor'];
         }
         $color_primario = $custom_colors['color_primario'] ?? '#1E40AF';
         $color_secundario = $custom_colors['color_secundario'] ?? '#10B981';
+        $color_terciario = $custom_colors['color_terciario'] ?? '#6366F1';
+        $color_acento1 = $custom_colors['color_acento1'] ?? '#F59E0B';
+        $color_acento2 = $custom_colors['color_acento2'] ?? '#EC4899';
+        $color_header = $custom_colors['color_header'] ?? '#1E40AF';
+        $color_sidebar = $custom_colors['color_sidebar'] ?? '#1F2937';
+        $color_footer = $custom_colors['color_footer'] ?? '#111827';
     } catch (Exception $e) {
         $color_primario = '#1E40AF';
         $color_secundario = '#10B981';
+        $color_terciario = '#6366F1';
+        $color_acento1 = '#F59E0B';
+        $color_acento2 = '#EC4899';
+        $color_header = '#1E40AF';
+        $color_sidebar = '#1F2937';
+        $color_footer = '#111827';
     }
     
     // Contar notificaciones no leídas
@@ -44,9 +56,16 @@ $user = getCurrentUser();
         :root {
             --color-primario: <?php echo $color_primario; ?>;
             --color-secundario: <?php echo $color_secundario; ?>;
+            --color-terciario: <?php echo $color_terciario; ?>;
+            --color-acento1: <?php echo $color_acento1; ?>;
+            --color-acento2: <?php echo $color_acento2; ?>;
+            --color-header: <?php echo $color_header; ?>;
+            --color-sidebar: <?php echo $color_sidebar; ?>;
+            --color-footer: <?php echo $color_footer; ?>;
         }
         .sidebar {
             transition: transform 0.3s ease-in-out;
+            background-color: var(--color-sidebar) !important;
         }
         @media (max-width: 1024px) {
             .sidebar {
@@ -78,6 +97,16 @@ $user = getCurrentUser();
         }
         .text-green-600 {
             color: var(--color-secundario) !important;
+        }
+        /* Header custom color */
+        nav.bg-white {
+            background-color: var(--color-header) !important;
+        }
+        nav.bg-white a, nav.bg-white button {
+            color: white !important;
+        }
+        nav.bg-white .bg-blue-600 {
+            background-color: rgba(255, 255, 255, 0.2) !important;
         }
     </style>
 </head>

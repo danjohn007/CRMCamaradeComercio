@@ -2,13 +2,13 @@
     </div>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-12">
+    <footer class="bg-white border-t border-gray-200 mt-12" style="background-color: var(--color-footer, #111827); color: white; border-color: rgba(255, 255, 255, 0.1);">
         <div class="container mx-auto px-4 py-6">
             <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-gray-600 text-sm mb-4 md:mb-0">
+                <div class="text-sm mb-4 md:mb-0" style="color: rgba(255, 255, 255, 0.8);">
                     © <?php echo date('Y'); ?> <?php echo APP_NAME; ?>. Todos los derechos reservados.
                 </div>
-                <div class="flex space-x-6 text-sm text-gray-600">
+                <div class="flex space-x-6 text-sm">
                     <?php
                     // Obtener términos y privacidad desde configuración
                     try {
@@ -26,16 +26,16 @@
                     }
                     ?>
                     <?php if ($has_terminos): ?>
-                        <a href="<?php echo BASE_URL; ?>/terminos.php" class="hover:text-blue-600">Términos y Condiciones</a>
+                        <a href="<?php echo BASE_URL; ?>/terminos.php" class="hover:text-blue-300" style="color: rgba(255, 255, 255, 0.8);">Términos y Condiciones</a>
                     <?php endif; ?>
                     <?php if ($has_privacidad): ?>
-                        <a href="<?php echo BASE_URL; ?>/privacidad.php" class="hover:text-blue-600">Política de Privacidad</a>
+                        <a href="<?php echo BASE_URL; ?>/privacidad.php" class="hover:text-blue-300" style="color: rgba(255, 255, 255, 0.8);">Política de Privacidad</a>
                     <?php endif; ?>
                 </div>
             </div>
             <!-- Estrategia Digital -->
-            <div class="text-center mt-4 pt-4 border-t border-gray-100">
-                <p class="text-xs text-gray-500">
+            <div class="text-center mt-4 pt-4" style="border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <p class="text-xs" style="color: rgba(255, 255, 255, 0.6);">
                     <?php
                     // Obtener configuración de footer link
                     try {
@@ -52,13 +52,13 @@
                         // Reemplazar "ID" con un enlace
                         $text_parts = explode(' ID', $footer_link['text']);
                         if (count($text_parts) > 1) {
-                            echo htmlspecialchars($text_parts[0]) . ' <a href="' . htmlspecialchars($footer_link['url']) . '" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline font-semibold">ID</a>' . htmlspecialchars($text_parts[1]);
+                            echo htmlspecialchars($text_parts[0]) . ' <a href="' . htmlspecialchars($footer_link['url']) . '" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:underline font-semibold">ID</a>' . htmlspecialchars($text_parts[1]);
                         } else {
                             // Si no tiene "ID", usar el enlace completo
-                            echo '<a href="' . htmlspecialchars($footer_link['url']) . '" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">' . htmlspecialchars($footer_link['text']) . '</a>';
+                            echo '<a href="' . htmlspecialchars($footer_link['url']) . '" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:underline">' . htmlspecialchars($footer_link['text']) . '</a>';
                         }
                     } catch (Exception $e) {
-                        echo 'Estrategia Digital desarrollada por <a href="https://impactosdigitales.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline font-semibold">ID</a>';
+                        echo 'Estrategia Digital desarrollada por <a href="https://impactosdigitales.com" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:underline font-semibold">ID</a>';
                     }
                     ?>
                 </p>
