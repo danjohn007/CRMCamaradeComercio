@@ -87,8 +87,9 @@ try {
         throw new Exception('Membresía no encontrada');
     }
     
-    if ($nueva_membresia['nivel_orden'] <= $empresa['nivel_actual']) {
-        throw new Exception('La nueva membresía debe ser de nivel superior');
+    // Verificar que no sea la misma membresía actual
+    if ($empresa['membresia_actual_id'] !== null && intval($nueva_membresia['id']) === intval($empresa['membresia_actual_id'])) {
+        throw new Exception('Ya tienes esta membresía activa');
     }
     
     // Iniciar transacción

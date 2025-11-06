@@ -32,27 +32,16 @@ if (!$user['empresa_id']) {
     $stmt->execute([$user['empresa_id']]);
     $empresa = $stmt->fetch();
     
-    // Obtener membresías superiores disponibles (o todas si no tiene membresía)
+    // Obtener todas las membresías activas disponibles
     $nivel_actual = $empresa['membresia_nivel'] ?? 0;
     
-    // Si no tiene membresía actual, mostrar todas las membresías activas
-    if ($nivel_actual == 0 || empty($empresa['membresia_id'])) {
-        $stmt = $db->prepare("
-            SELECT * FROM membresias 
-            WHERE activo = 1 
-            ORDER BY nivel_orden ASC
-        ");
-        $stmt->execute();
-    } else {
-        // Si ya tiene membresía, mostrar solo las superiores
-        $stmt = $db->prepare("
-            SELECT * FROM membresias 
-            WHERE activo = 1 
-            AND nivel_orden > ?
-            ORDER BY nivel_orden ASC
-        ");
-        $stmt->execute([$nivel_actual]);
-    }
+    // Mostrar TODAS las membresías activas, no solo las superiores
+    $stmt = $db->prepare("
+        SELECT * FROM membresias 
+        WHERE activo = 1 
+        ORDER BY nivel_orden ASC
+    ");
+    $stmt->execute();
     $membresias_superiores = $stmt->fetchAll();
 }
 
@@ -152,20 +141,27 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
         </div>
 
-        <!-- Membresías Superiores Disponibles -->
+        <!-- Membresías Disponibles -->
         <?php if (count($membresias_superiores) > 0): ?>
         <div class="mb-6">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">
                 Actualiza tu Membresía
-                <span class="text-sm font-normal text-gray-600">Accede a más beneficios</span>
+                <span class="text-sm font-normal text-gray-600">Todas las membresías disponibles</span>
             </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <?php foreach ($membresias_superiores as $membresia): ?>
-                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden">
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
+                <?php foreach ($membresias_superiores as $membresia): 
+                    $es_actual = ($empresa['membresia_id'] !== null && intval($empresa['membresia_id']) === intval($membresia['id']));
+                ?>
+                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden <?php echo $es_actual ? 'ring-2 ring-green-500' : ''; ?>">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white <?php echo $es_actual ? 'relative' : ''; ?>">
                         <h3 class="text-xl font-bold"><?php echo e($membresia['nombre']); ?></h3>
                         <p class="text-blue-100 text-sm mt-1">Nivel <?php echo $membresia['nivel_orden']; ?></p>
+                        <?php if ($es_actual): ?>
+                        <span class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            <i class="fas fa-check mr-1"></i>Actual
+                        </span>
+                        <?php endif; ?>
                     </div>
                     
                     <div class="p-6">
@@ -203,27 +199,34 @@ include __DIR__ . '/app/views/layouts/header.php';
                         </div>
                         <?php endif; ?>
                         
+                        <?php if ($es_actual): ?>
+                        <button disabled
+                                class="w-full bg-gray-400 text-white px-4 py-3 rounded-lg cursor-not-allowed font-semibold">
+                            <i class="fas fa-check mr-2"></i>Membresía Actual
+                        </button>
+                        <?php else: ?>
                         <button onclick="abrirModalUpgrade(<?php echo $membresia['id']; ?>, '<?php echo addslashes($membresia['nombre']); ?>', <?php echo $membresia['costo']; ?>)"
                                 class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
                             <i class="fas fa-arrow-circle-up mr-2"></i>Actualizar Ahora
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endforeach; ?>
             </div>
         </div>
         <?php else: ?>
-        <div class="bg-green-50 border-l-4 border-green-500 p-4">
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
             <div class="flex">
                 <div class="flex-shrink-0">
-                    <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-xl"></i>
                 </div>
                 <div class="ml-3">
-                    <p class="text-green-700 font-semibold">
-                        ¡Tienes la membresía de nivel más alto!
+                    <p class="text-yellow-700 font-semibold">
+                        No hay membresías disponibles
                     </p>
-                    <p class="text-green-600 text-sm mt-1">
-                        Disfruta de todos los beneficios premium de tu membresía.
+                    <p class="text-yellow-600 text-sm mt-1">
+                        Contacte al administrador para más información.
                     </p>
                 </div>
             </div>

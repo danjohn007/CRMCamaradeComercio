@@ -81,6 +81,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         }
     }
     
+    // Validate membresia_id exists in membresias table to avoid foreign key constraint error
+    $membresia_id_value = null;
+    if (!empty($_POST['membresia_id'])) {
+        $mid = intval($_POST['membresia_id']);
+        $stmt_check = $db->prepare("SELECT 1 FROM membresias WHERE id = ? AND activo = 1");
+        $stmt_check->execute([$mid]);
+        if ($stmt_check->fetch()) {
+            $membresia_id_value = $mid;
+        }
+    }
+    
     $data = [
         'razon_social' => sanitize($_POST['razon_social'] ?? ''),
         'rfc' => strtoupper(sanitize($_POST['rfc'] ?? '')),
@@ -97,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'estado' => sanitize($_POST['estado'] ?? 'Querétaro'),
         'sector_id' => $_POST['sector_id'] ?? null,
         'categoria_id' => $_POST['categoria_id'] ?? null,
-        'membresia_id' => $_POST['membresia_id'] ?? null,
+        'membresia_id' => $membresia_id_value,
         'vendedor_id' => $vendedor_id_value,
         'tipo_afiliacion' => $tipo_afiliacion_select,
         'fecha_renovacion' => $_POST['fecha_renovacion'] ?? null,
