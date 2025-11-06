@@ -58,6 +58,26 @@ include __DIR__ . '/app/views/layouts/header.php';
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold text-gray-800 mb-6">Mi Membresía</h1>
 
+    <?php if (isset($_SESSION['success_message'])): ?>
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-500 text-xl mr-3"></i>
+                <p class="text-green-700"><?php echo e($_SESSION['success_message']); ?></p>
+            </div>
+        </div>
+        <?php unset($_SESSION['success_message']); ?>
+    <?php endif; ?>
+
+    <?php if (isset($_SESSION['error_message'])): ?>
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 text-xl mr-3"></i>
+                <p class="text-red-700"><?php echo e($_SESSION['error_message']); ?></p>
+            </div>
+        </div>
+        <?php unset($_SESSION['error_message']); ?>
+    <?php endif; ?>
+
     <?php if (isset($error)): ?>
         <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
             <p class="text-red-700"><?php echo e($error); ?></p>
@@ -199,17 +219,10 @@ include __DIR__ . '/app/views/layouts/header.php';
                         </div>
                         <?php endif; ?>
                         
-                        <?php if ($es_actual): ?>
-                        <button disabled
-                                class="w-full bg-gray-400 text-white px-4 py-3 rounded-lg cursor-not-allowed font-semibold">
-                            <i class="fas fa-check mr-2"></i>Membresía Actual
-                        </button>
-                        <?php else: ?>
-                        <button onclick="abrirModalUpgrade(<?php echo $membresia['id']; ?>, '<?php echo addslashes($membresia['nombre']); ?>', <?php echo $membresia['costo']; ?>)"
-                                class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
-                            <i class="fas fa-arrow-circle-up mr-2"></i>Actualizar Ahora
-                        </button>
-                        <?php endif; ?>
+                        <?php 
+                        // Usar el partial de botones de membresía con funcionalidad real
+                        include __DIR__ . '/app/views/empresas/partials/membresia_buttons.php'; 
+                        ?>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -236,7 +249,18 @@ include __DIR__ . '/app/views/layouts/header.php';
     <?php endif; ?>
 </div>
 
-<!-- Modal para Upgrade de Membresía -->
+<!-- 
+    NOTA: El modal de PayPal y su código JavaScript han sido comentados temporalmente.
+    Se mantienen aquí para referencia y posible reactivación futura.
+    El nuevo sistema utiliza formularios POST directos al endpoint update_membresia.php
+    
+    Para reactivar el modal de PayPal:
+    1. Descomentar el código HTML y JavaScript a continuación
+    2. Modificar membresia_buttons.php para usar onclick="abrirModalUpgrade(...)" en lugar de formularios POST
+    3. Verificar que la configuración de PayPal esté correcta en la tabla configuracion
+-->
+
+<!--
 <div id="modalUpgrade" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
     <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-lg bg-white">
         <div class="flex justify-between items-center mb-4">
@@ -289,7 +313,6 @@ include __DIR__ . '/app/views/layouts/header.php';
     </div>
 </div>
 
-<!-- PayPal SDK -->
 <?php if (!empty($config_paypal['paypal_client_id'])): ?>
 <script src="https://www.paypal.com/sdk/js?client-id=<?php echo $config_paypal['paypal_client_id']; ?>&currency=MXN"></script>
 <?php endif; ?>
@@ -302,7 +325,6 @@ function abrirModalUpgrade(membresiaId, membresiaNombre, monto) {
     document.getElementById('nueva_membresia_nombre').textContent = membresiaNombre;
     document.getElementById('monto_upgrade').textContent = '$' + parseFloat(monto).toFixed(2);
     
-    // Verificar que PayPal esté configurado
     if (typeof paypal === 'undefined') {
         showMessage('error', 'PayPal no está configurado correctamente. Contacte al administrador.');
         return;
@@ -310,7 +332,6 @@ function abrirModalUpgrade(membresiaId, membresiaNombre, monto) {
     
     document.getElementById('modalUpgrade').classList.remove('hidden');
     
-    // Renderizar botón de PayPal si aún no se ha hecho
     if (!paypalButtonRendered) {
         renderPayPalButton(monto, membresiaId);
         paypalButtonRendered = true;
@@ -338,7 +359,6 @@ function renderPayPalButton(monto, membresiaId) {
             try {
                 const order = await actions.order.capture();
                 
-                // Enviar a nuestro servidor para procesar
                 const response = await fetch('<?php echo BASE_URL; ?>/api/procesar_upgrade_membresia.php', {
                     method: 'POST',
                     headers: {
@@ -380,12 +400,12 @@ function showMessage(type, message) {
     messageDiv.classList.remove('hidden');
 }
 
-// Cerrar modal al hacer clic fuera
 document.getElementById('modalUpgrade').addEventListener('click', function(e) {
     if (e.target === this) {
         cerrarModalUpgrade();
     }
 });
 </script>
+-->
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>
