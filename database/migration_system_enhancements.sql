@@ -30,6 +30,13 @@ INSERT INTO configuracion (clave, valor, descripcion) VALUES
 ON DUPLICATE KEY UPDATE descripcion = 'Color para el pie de página (footer)';
 
 -- Configuración SMTP para el sistema de correos
+-- ADVERTENCIA DE SEGURIDAD: Este archivo contiene credenciales de acceso.
+-- Se recomienda encarecidamente:
+-- 1. Cambiar la contraseña después de ejecutar esta migración
+-- 2. Restringir el acceso a este archivo en el servidor de producción
+-- 3. No compartir este archivo en repositorios públicos
+-- 4. Considerar usar variables de entorno para credenciales sensibles
+--
 -- Usuario: canaco@agenciaexperiencia.com
 -- Servidor: agenciaexperiencia.com
 -- SMTP Puerto: 465 (SSL)
@@ -48,9 +55,11 @@ INSERT INTO configuracion (clave, valor, descripcion) VALUES
     ('smtp_user', 'canaco@agenciaexperiencia.com', 'Usuario para autenticación SMTP')
 ON DUPLICATE KEY UPDATE valor = 'canaco@agenciaexperiencia.com', descripcion = 'Usuario para autenticación SMTP';
 
+-- NOTA DE SEGURIDAD: Esta contraseña es proporcionada por el cliente para configuración inicial.
+-- Es CRÍTICO cambiar esta contraseña inmediatamente después de la instalación por razones de seguridad.
 INSERT INTO configuracion (clave, valor, descripcion) VALUES
-    ('smtp_pass', 'Danjohn007', 'Contraseña para autenticación SMTP')
-ON DUPLICATE KEY UPDATE valor = 'Danjohn007', descripcion = 'Contraseña para autenticación SMTP';
+    ('smtp_pass', 'Danjohn007', 'Contraseña para autenticación SMTP - CAMBIAR DESPUÉS DE INSTALACIÓN')
+ON DUPLICATE KEY UPDATE valor = 'Danjohn007', descripcion = 'Contraseña para autenticación SMTP - CAMBIAR DESPUÉS DE INSTALACIÓN';
 
 INSERT INTO configuracion (clave, valor, descripcion) VALUES
     ('smtp_secure', 'ssl', 'Tipo de encriptación (ssl o tls)')
