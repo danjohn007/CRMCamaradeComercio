@@ -150,11 +150,18 @@ include __DIR__ . '/app/views/layouts/header.php';
             </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <?php foreach ($membresias_superiores as $membresia): ?>
-                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden">
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
+                <?php foreach ($membresias_superiores as $membresia): 
+                    $es_actual = ($empresa['membresia_id'] == $membresia['id']);
+                ?>
+                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden <?php echo $es_actual ? 'ring-2 ring-green-500' : ''; ?>">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white <?php echo $es_actual ? 'relative' : ''; ?>">
                         <h3 class="text-xl font-bold"><?php echo e($membresia['nombre']); ?></h3>
                         <p class="text-blue-100 text-sm mt-1">Nivel <?php echo $membresia['nivel_orden']; ?></p>
+                        <?php if ($es_actual): ?>
+                        <span class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            <i class="fas fa-check mr-1"></i>Actual
+                        </span>
+                        <?php endif; ?>
                     </div>
                     
                     <div class="p-6">
@@ -192,10 +199,17 @@ include __DIR__ . '/app/views/layouts/header.php';
                         </div>
                         <?php endif; ?>
                         
+                        <?php if ($es_actual): ?>
+                        <button disabled
+                                class="w-full bg-gray-400 text-white px-4 py-3 rounded-lg cursor-not-allowed font-semibold">
+                            <i class="fas fa-check mr-2"></i>Membresía Actual
+                        </button>
+                        <?php else: ?>
                         <button onclick="abrirModalUpgrade(<?php echo $membresia['id']; ?>, '<?php echo addslashes($membresia['nombre']); ?>', <?php echo $membresia['costo']; ?>)"
                                 class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
                             <i class="fas fa-arrow-circle-up mr-2"></i>Actualizar Ahora
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endforeach; ?>
