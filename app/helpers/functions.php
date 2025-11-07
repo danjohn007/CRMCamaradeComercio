@@ -132,6 +132,12 @@ function formatMoney($amount) {
  * de fallos en el envío de emails.
  */
 function sendEmail($to, $subject, $body) {
+    // Validar email del destinatario para prevenir ataques de inyección
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        error_log("sendEmail: Invalid email address: " . $to);
+        return false;
+    }
+    
     $config = getConfiguracion();
     $from = $config['email_sistema'] ?? 'noreply@camaraqro.com';
     $fromName = $config['smtp_from_name'] ?? $config['nombre_sitio'] ?? APP_NAME;
