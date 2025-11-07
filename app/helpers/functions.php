@@ -119,12 +119,20 @@ function formatMoney($amount) {
 }
 
 /**
- * Enviar email (placeholder - implementar con PHPMailer o similar)
+ * Enviar email usando configuración del sistema
  */
 function sendEmail($to, $subject, $body) {
-    // TODO: Implementar envío de correo real
-    // Por ahora solo simulamos el envío
-    return true;
+    $config = getConfiguracion();
+    $from = $config['email_sistema'] ?? 'noreply@camaraqro.com';
+    $fromName = $config['smtp_from_name'] ?? $config['nombre_sitio'] ?? APP_NAME;
+    
+    // Headers
+    $headers = "From: {$fromName} <{$from}>\r\n";
+    $headers .= "Reply-To: {$from}\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    
+    return mail($to, $subject, $body, $headers);
 }
 
 /**

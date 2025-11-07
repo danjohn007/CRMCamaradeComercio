@@ -9,15 +9,15 @@ $user = getCurrentUser();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo APP_NAME; ?></title>
+    <title><?php echo isset($nombre_sitio_header) ? e($nombre_sitio_header) : APP_NAME; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <?php
-    // Cargar colores personalizados
+    // Cargar colores personalizados y nombre del sitio
     try {
         $db = Database::getInstance()->getConnection();
-        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario', 'color_terciario', 'color_acento1', 'color_acento2', 'color_header', 'color_sidebar', 'color_footer')");
+        $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario', 'color_terciario', 'color_acento1', 'color_acento2', 'color_header', 'color_sidebar', 'color_footer', 'nombre_sitio')");
         $custom_colors = [];
         while ($row = $stmt->fetch()) {
             $custom_colors[$row['clave']] = $row['valor'];
@@ -30,6 +30,7 @@ $user = getCurrentUser();
         $color_header = $custom_colors['color_header'] ?? '#1E40AF';
         $color_sidebar = $custom_colors['color_sidebar'] ?? '#1F2937';
         $color_footer = $custom_colors['color_footer'] ?? '#111827';
+        $nombre_sitio_header = $custom_colors['nombre_sitio'] ?? APP_NAME;
     } catch (Exception $e) {
         $color_primario = '#1E40AF';
         $color_secundario = '#10B981';
@@ -39,6 +40,7 @@ $user = getCurrentUser();
         $color_header = '#1E40AF';
         $color_sidebar = '#1F2937';
         $color_footer = '#111827';
+        $nombre_sitio_header = APP_NAME;
     }
     
     // Contar notificaciones no leídas
@@ -141,7 +143,7 @@ $user = getCurrentUser();
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                             </svg>
                         </div>
-                        <span class="font-bold text-xl text-gray-800 hidden md:block"><?php echo APP_NAME; ?></span>
+                        <span class="font-bold text-xl text-gray-800 hidden md:block" style="color: white;"><?php echo e($nombre_sitio_header); ?></span>
                     </a>
                 </div>
 
