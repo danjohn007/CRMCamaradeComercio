@@ -227,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $_SESSION['captcha_evento_num1'] = rand(1, 10);
         $_SESSION['captcha_evento_num2'] = rand(1, 10);
         
-        $success = "¡Registro exitoso! Se han confirmado {$boletos} boleto(s) para el evento. Recibirá un correo de confirmación con su boleto digital.";
+        $success = "¡Registro exitoso! Se han confirmado {$boletos} boleto(s) para el evento. Recibirá un correo de confirmación con su boleto digital (puede llegar a spam).";
         
         // Agregar enlace para imprimir boleto
         $success .= " <a href='" . BASE_URL . "/boleto_digital.php?codigo={$codigo_qr}' target='_blank' class='underline font-bold'>Imprimir Boleto Ahora</a>";

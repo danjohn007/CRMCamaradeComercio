@@ -82,6 +82,19 @@ $user = getCurrentUser();
         .dropdown-menu.show {
             display: block;
         }
+        /* Apply header color to dropdown menu */
+        .dropdown-menu {
+            background-color: var(--color-header) !important;
+        }
+        .dropdown-menu a {
+            color: white !important;
+        }
+        .dropdown-menu a:hover {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+        }
+        .dropdown-menu hr {
+            border-color: rgba(255, 255, 255, 0.3) !important;
+        }
         /* Apply custom colors */
         .bg-blue-600, .bg-blue-50 .bg-blue-600 {
             background-color: var(--color-primario) !important;
