@@ -15,6 +15,13 @@ $success = '';
 $token = $_GET['token'] ?? '';
 $valid_token = false;
 
+// Obtener configuración del sistema una sola vez
+$config = getConfiguracion();
+$nombre_sitio = $config['nombre_sitio'] ?? APP_NAME;
+$color_primario = $config['color_primario'] ?? '#1E40AF';
+$color_secundario = $config['color_secundario'] ?? '#10B981';
+$logo_sistema = $config['logo_sistema'] ?? '';
+
 // Verificar token
 if (!empty($token)) {
     try {
@@ -22,7 +29,9 @@ if (!empty($token)) {
         $stmt = $db->prepare("
             SELECT id, email, nombre 
             FROM usuarios 
-            WHERE reset_token = ? 
+            WHERE reset_token IS NOT NULL
+            AND reset_token != ''
+            AND reset_token = ? 
             AND reset_token_expiry > NOW() 
             AND activo = 1
         ");
@@ -83,24 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
     }
 }
 
-// Cargar configuración de colores y nombre del sitio
-try {
-    $db = Database::getInstance()->getConnection();
-    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario', 'logo_sistema', 'nombre_sitio')");
-    $custom_config = [];
-    while ($row = $stmt->fetch()) {
-        $custom_config[$row['clave']] = $row['valor'];
-    }
-    $color_primario = $custom_config['color_primario'] ?? '#1E40AF';
-    $color_secundario = $custom_config['color_secundario'] ?? '#10B981';
-    $logo_sistema = $custom_config['logo_sistema'] ?? '';
-    $nombre_sitio = $custom_config['nombre_sitio'] ?? APP_NAME;
-} catch (Exception $e) {
-    $color_primario = '#1E40AF';
-    $color_secundario = '#10B981';
-    $logo_sistema = '';
-    $nombre_sitio = APP_NAME;
-}
+// Configuration already loaded at the top
 ?>
 <!DOCTYPE html>
 <html lang="es">

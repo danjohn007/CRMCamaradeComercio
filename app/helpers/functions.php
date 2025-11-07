@@ -120,6 +120,16 @@ function formatMoney($amount) {
 
 /**
  * Enviar email usando configuración del sistema
+ * 
+ * @param string $to Dirección de email del destinatario
+ * @param string $subject Asunto del email
+ * @param string $body Cuerpo del mensaje (texto plano)
+ * @return bool True si el email fue enviado, false en caso contrario
+ * 
+ * NOTA: Esta función depende de que el servidor tenga configurado un servicio de correo
+ * (sendmail, postfix, etc.). Si el servidor no tiene servicio de correo configurado,
+ * la función retornará false. Se recomienda verificar los logs del servidor en caso
+ * de fallos en el envío de emails.
  */
 function sendEmail($to, $subject, $body) {
     $config = getConfiguracion();

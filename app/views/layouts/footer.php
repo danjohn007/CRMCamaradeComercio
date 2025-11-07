@@ -6,20 +6,8 @@
         <div class="container mx-auto px-4 py-6">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <?php
-                // Obtener nombre del sitio desde configuración
-                try {
-                    $db_footer_name = Database::getInstance()->getConnection();
-                    $stmt_name = $db_footer_name->query("SELECT valor FROM configuracion WHERE clave = 'nombre_sitio'");
-                    $nombre_sitio_footer = '';
-                    if ($row_name = $stmt_name->fetch()) {
-                        $nombre_sitio_footer = $row_name['valor'];
-                    }
-                    if (empty($nombre_sitio_footer)) {
-                        $nombre_sitio_footer = APP_NAME;
-                    }
-                } catch (Exception $e) {
-                    $nombre_sitio_footer = APP_NAME;
-                }
+                // Obtener nombre del sitio desde configuración (usa caché estática)
+                $nombre_sitio_footer = getConfiguracion('nombre_sitio') ?? APP_NAME;
                 ?>
                 <div class="text-sm mb-4 md:mb-0" style="color: rgba(255, 255, 255, 0.8);">
                     © <?php echo date('Y'); ?> <?php echo e($nombre_sitio_footer); ?>. Todos los derechos reservados.

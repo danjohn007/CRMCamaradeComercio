@@ -13,6 +13,10 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
+// Obtener configuración del sistema una sola vez
+$config = getConfiguracion();
+$nombre_sitio = $config['nombre_sitio'] ?? APP_NAME;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = sanitize($_POST['email'] ?? '');
     
@@ -37,8 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$token, $expiry, $user['id']]);
                 
                 // Enviar email con el enlace de recuperación
-                $config = getConfiguracion();
-                $nombre_sitio = $config['nombre_sitio'] ?? APP_NAME;
                 $reset_link = BASE_URL . "/reset-password.php?token=" . $token;
                 
                 $email_body = "Hola " . $user['nombre'] . ",\n\n";
@@ -64,24 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Cargar configuración de colores y nombre del sitio
-try {
-    $db = Database::getInstance()->getConnection();
-    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('color_primario', 'color_secundario', 'logo_sistema', 'nombre_sitio')");
-    $custom_config = [];
-    while ($row = $stmt->fetch()) {
-        $custom_config[$row['clave']] = $row['valor'];
-    }
-    $color_primario = $custom_config['color_primario'] ?? '#1E40AF';
-    $color_secundario = $custom_config['color_secundario'] ?? '#10B981';
-    $logo_sistema = $custom_config['logo_sistema'] ?? '';
-    $nombre_sitio = $custom_config['nombre_sitio'] ?? APP_NAME;
-} catch (Exception $e) {
-    $color_primario = '#1E40AF';
-    $color_secundario = '#10B981';
-    $logo_sistema = '';
-    $nombre_sitio = APP_NAME;
-}
+// Cargar configuración de colores y logo del sitio (nombre_sitio ya cargado arriba)
+$color_primario = $config['color_primario'] ?? '#1E40AF';
+$color_secundario = $config['color_secundario'] ?? '#10B981';
+$logo_sistema = $config['logo_sistema'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
