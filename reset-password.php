@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
     }
 }
 
-// Configuration already loaded at the top
+
 ?>
 <!DOCTYPE html>
 <html lang="es">

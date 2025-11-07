@@ -100,11 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     // Enviar email de verificación
                     $verify_link = BASE_URL . "/verify-email.php?code=" . $codigo_verificacion;
-                    $config_email = getConfiguracion();
-                    $nombre_sitio_email = $config_email['nombre_sitio'] ?? APP_NAME;
-                    $email_body = "Hola,\n\nGracias por registrarte en " . $nombre_sitio_email . ".\n\nPor favor, verifica tu email haciendo clic en el siguiente enlace:\n\n" . $verify_link . "\n\nSi no te registraste, ignora este mensaje.";
+                    $nombre_sitio = $nombre_sitio ?? APP_NAME; // Use nombre_sitio from page config
+                    $email_body = "Hola,\n\nGracias por registrarte en " . $nombre_sitio . ".\n\nPor favor, verifica tu email haciendo clic en el siguiente enlace:\n\n" . $verify_link . "\n\nSi no te registraste, ignora este mensaje.";
                     
-                    sendEmail($email, 'Verifica tu email - ' . $nombre_sitio_email, $email_body);
+                    sendEmail($email, 'Verifica tu email - ' . $nombre_sitio, $email_body);
                     
                     // Redirigir a login con mensaje de verificación de email
                     redirect('/login.php?success=verify_email');

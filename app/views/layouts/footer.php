@@ -7,10 +7,10 @@
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <?php
                 // Obtener nombre del sitio desde configuración (usa caché estática)
-                $nombre_sitio_footer = getConfiguracion('nombre_sitio') ?? APP_NAME;
+                $nombre_sitio = getConfiguracion('nombre_sitio') ?? APP_NAME;
                 ?>
                 <div class="text-sm mb-4 md:mb-0" style="color: rgba(255, 255, 255, 0.8);">
-                    © <?php echo date('Y'); ?> <?php echo e($nombre_sitio_footer); ?>. Todos los derechos reservados.
+                    © <?php echo date('Y'); ?> <?php echo e($nombre_sitio); ?>. Todos los derechos reservados.
                 </div>
                 <div class="flex space-x-6 text-sm">
                     <?php
