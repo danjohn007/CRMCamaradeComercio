@@ -98,7 +98,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Confirmar transacción
                     $db->commit();
                     
-                    // Enviar email de verificación (uses $nombre_sitio from page config)
+                    // Obtener nombre del sitio para el email
+                    $nombre_sitio = APP_NAME;
+                    try {
+                        $stmt_config = $db->prepare("SELECT valor FROM configuracion WHERE clave = 'nombre_sitio'");
+                        $stmt_config->execute();
+                        $config_row = $stmt_config->fetch();
+                        if ($config_row && !empty($config_row['valor'])) {
+                            $nombre_sitio = $config_row['valor'];
+                        }
+                    } catch (Exception $e) {
+                        // Use APP_NAME as fallback
+                    }
+                    
+                    // Enviar email de verificación
                     $verify_link = BASE_URL . "/verify-email.php?code=" . $codigo_verificacion;
                     $email_body = "Hola,\n\nGracias por registrarte en " . $nombre_sitio . ".\n\nPor favor, verifica tu email haciendo clic en el siguiente enlace:\n\n" . $verify_link . "\n\nSi no te registraste, ignora este mensaje.";
                     

@@ -539,7 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <!-- Footer -->
             <div class="mt-8 text-center text-gray-600">
-                <p>¿Tiene problemas? Contáctenos al correo: info@camaraqro.com</p>
+                <p>¿Tiene problemas? Contáctenos al correo: <?php echo htmlspecialchars($config['email_sistema'] ?? 'info@camaraqro.com'); ?></p>
             </div>
         </div>
     </div>

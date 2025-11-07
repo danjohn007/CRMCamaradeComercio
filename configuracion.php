@@ -13,6 +13,17 @@ $db = Database::getInstance()->getConnection();
 $error = '';
 $success = '';
 
+// Obtener configuración actual ANTES de procesar POST
+try {
+    $stmt = $db->query("SELECT clave, valor FROM configuracion");
+    $config = [];
+    while ($row = $stmt->fetch()) {
+        $config[$row['clave']] = $row['valor'];
+    }
+} catch (Exception $e) {
+    $config = [];
+}
+
 // Procesar actualización de configuración
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -103,15 +114,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Obtener configuración actual
-try {
-    $stmt = $db->query("SELECT clave, valor FROM configuracion");
-    $config = [];
-    while ($row = $stmt->fetch()) {
-        $config[$row['clave']] = $row['valor'];
+// Recargar configuración después de guardar para mostrar los valores actualizados
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $stmt = $db->query("SELECT clave, valor FROM configuracion");
+        $config = [];
+        while ($row = $stmt->fetch()) {
+            $config[$row['clave']] = $row['valor'];
+        }
+    } catch (Exception $e) {
+        $config = [];
     }
-} catch (Exception $e) {
-    $config = [];
 }
 
 include __DIR__ . '/app/views/layouts/header.php';
