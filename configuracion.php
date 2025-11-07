@@ -13,6 +13,19 @@ $db = Database::getInstance()->getConnection();
 $error = '';
 $success = '';
 
+// Obtener configuración actual ANTES de procesar POST
+// Nota: No usamos getConfiguracion() aquí porque tiene caché estático
+// y no reflejaría cambios guardados en el mismo request
+try {
+    $stmt = $db->query("SELECT clave, valor FROM configuracion");
+    $config = [];
+    while ($row = $stmt->fetch()) {
+        $config[$row['clave']] = $row['valor'];
+    }
+} catch (Exception $e) {
+    $config = [];
+}
+
 // Procesar actualización de configuración
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -98,20 +111,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$user['id']]);
 
         $success = 'Configuración actualizada exitosamente';
+        
+        // Recargar configuración para mostrar valores actualizados
+        $stmt = $db->query("SELECT clave, valor FROM configuracion");
+        $config = [];
+        while ($row = $stmt->fetch()) {
+            $config[$row['clave']] = $row['valor'];
+        }
     } catch (Exception $e) {
         $error = 'Error al guardar la configuración: ' . $e->getMessage();
     }
-}
-
-// Obtener configuración actual
-try {
-    $stmt = $db->query("SELECT clave, valor FROM configuracion");
-    $config = [];
-    while ($row = $stmt->fetch()) {
-        $config[$row['clave']] = $row['valor'];
-    }
-} catch (Exception $e) {
-    $config = [];
 }
 
 include __DIR__ . '/app/views/layouts/header.php';
