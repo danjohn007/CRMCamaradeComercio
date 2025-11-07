@@ -64,6 +64,7 @@ class EmailHelper {
      */
     public static function sendEventTicket($inscripcion, $evento, $qrCodePath) {
         $config = getConfiguracion();
+        $nombre_sitio = $config['nombre_sitio'] ?? APP_NAME;
         $nombre = $inscripcion['nombre_invitado'] ?? 'Asistente';
         $email = $inscripcion['email_invitado'];
         $razon_social = $inscripcion['razon_social_invitado'] ?? '';
@@ -98,7 +99,7 @@ class EmailHelper {
     <div class='container'>
         <div class='header'>
             <h1>¡Boleto Confirmado!</h1>
-            <p>" . APP_NAME . "</p>
+            <p>" . htmlspecialchars($nombre_sitio) . "</p>
         </div>
         
         <div class='content'>
@@ -191,9 +192,9 @@ class EmailHelper {
         </div>
         
         <div class='footer'>
-            <p>" . APP_NAME . "</p>
-            <p>Contacto: " . ($config['email_sistema'] ?? 'info@camaraqro.com') . "</p>
-            <p>" . ($config['telefono_contacto'] ?? '') . "</p>
+            <p>" . htmlspecialchars($nombre_sitio) . "</p>
+            <p>Contacto: " . htmlspecialchars($config['email_sistema'] ?? 'info@camaraqro.com') . "</p>
+            <p>" . htmlspecialchars($config['telefono_contacto'] ?? '') . "</p>
         </div>
     </div>
 </body>
