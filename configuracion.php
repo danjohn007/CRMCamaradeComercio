@@ -13,22 +13,18 @@ $db = Database::getInstance()->getConnection();
 $error = '';
 $success = '';
 
-// Función helper para cargar configuración
-$loadConfig = function() use ($db) {
-    try {
-        $stmt = $db->query("SELECT clave, valor FROM configuracion");
-        $config = [];
-        while ($row = $stmt->fetch()) {
-            $config[$row['clave']] = $row['valor'];
-        }
-        return $config;
-    } catch (Exception $e) {
-        return [];
-    }
-};
-
 // Obtener configuración actual ANTES de procesar POST
-$config = $loadConfig();
+// Nota: No usamos getConfiguracion() aquí porque tiene caché estático
+// y no reflejaría cambios guardados en el mismo request
+try {
+    $stmt = $db->query("SELECT clave, valor FROM configuracion");
+    $config = [];
+    while ($row = $stmt->fetch()) {
+        $config[$row['clave']] = $row['valor'];
+    }
+} catch (Exception $e) {
+    $config = [];
+}
 
 // Procesar actualización de configuración
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -115,14 +111,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$user['id']]);
 
         $success = 'Configuración actualizada exitosamente';
+        
+        // Recargar configuración para mostrar valores actualizados
+        $stmt = $db->query("SELECT clave, valor FROM configuracion");
+        $config = [];
+        while ($row = $stmt->fetch()) {
+            $config[$row['clave']] = $row['valor'];
+        }
     } catch (Exception $e) {
         $error = 'Error al guardar la configuración: ' . $e->getMessage();
     }
-}
-
-// Recargar configuración después de guardar para mostrar los valores actualizados
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $config = $loadConfig();
 }
 
 include __DIR__ . '/app/views/layouts/header.php';
