@@ -119,12 +119,36 @@ function formatMoney($amount) {
 }
 
 /**
- * Enviar email (placeholder - implementar con PHPMailer o similar)
+ * Enviar email usando configuración del sistema
+ * 
+ * @param string $to Dirección de email del destinatario
+ * @param string $subject Asunto del email
+ * @param string $body Cuerpo del mensaje (texto plano)
+ * @return bool True si el email fue enviado, false en caso contrario
+ * 
+ * NOTA: Esta función depende de que el servidor tenga configurado un servicio de correo
+ * (sendmail, postfix, etc.). Si el servidor no tiene servicio de correo configurado,
+ * la función retornará false. Se recomienda verificar los logs del servidor en caso
+ * de fallos en el envío de emails.
  */
 function sendEmail($to, $subject, $body) {
-    // TODO: Implementar envío de correo real
-    // Por ahora solo simulamos el envío
-    return true;
+    // Validar email del destinatario para prevenir ataques de inyección
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        error_log("sendEmail: Invalid email address: " . $to);
+        return false;
+    }
+    
+    $config = getConfiguracion();
+    $from = $config['email_sistema'] ?? 'noreply@camaraqro.com';
+    $fromName = $config['smtp_from_name'] ?? $config['nombre_sitio'] ?? APP_NAME;
+    
+    // Headers
+    $headers = "From: {$fromName} <{$from}>\r\n";
+    $headers .= "Reply-To: {$from}\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    
+    return mail($to, $subject, $body, $headers);
 }
 
 /**

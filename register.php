@@ -98,11 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Confirmar transacción
                     $db->commit();
                     
-                    // Enviar email de verificación
+                    // Enviar email de verificación (uses $nombre_sitio from page config)
                     $verify_link = BASE_URL . "/verify-email.php?code=" . $codigo_verificacion;
-                    $email_body = "Hola,\n\nGracias por registrarte en " . APP_NAME . ".\n\nPor favor, verifica tu email haciendo clic en el siguiente enlace:\n\n" . $verify_link . "\n\nSi no te registraste, ignora este mensaje.";
+                    $email_body = "Hola,\n\nGracias por registrarte en " . $nombre_sitio . ".\n\nPor favor, verifica tu email haciendo clic en el siguiente enlace:\n\n" . $verify_link . "\n\nSi no te registraste, ignora este mensaje.";
                     
-                    sendEmail($email, 'Verifica tu email - ' . APP_NAME, $email_body);
+                    sendEmail($email, 'Verifica tu email - ' . $nombre_sitio, $email_body);
                     
                     // Redirigir a login con mensaje de verificación de email
                     redirect('/login.php?success=verify_email');
