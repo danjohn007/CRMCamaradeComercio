@@ -71,6 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'telefono_contacto' => sanitize($_POST['telefono_contacto'] ?? ''),
             'horario_atencion' => sanitize($_POST['horario_atencion'] ?? ''),
             'paypal_account' => sanitize($_POST['paypal_account'] ?? ''),
+            'paypal_client_id' => sanitize($_POST['paypal_client_id'] ?? ''),
+            'paypal_secret' => sanitize($_POST['paypal_secret'] ?? ''),
+            'paypal_mode' => sanitize($_POST['paypal_mode'] ?? 'sandbox'),
+            'paypal_plan_id_monthly' => sanitize($_POST['paypal_plan_id_monthly'] ?? ''),
+            'paypal_plan_id_annual' => sanitize($_POST['paypal_plan_id_annual'] ?? ''),
+            'paypal_webhook_url' => sanitize($_POST['paypal_webhook_url'] ?? ''),
             'dias_aviso_renovacion' => sanitize($_POST['dias_aviso_renovacion'] ?? '30,15,5'),
             'max_boletos_por_registro' => intval($_POST['max_boletos_por_registro'] ?? 10),
             'color_primario' => sanitize($_POST['color_primario'] ?? '#1E40AF'),
@@ -274,19 +280,95 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
         </div>
 
-        <!-- Configuración de Pagos -->
+        <!-- Configuración de PayPal -->
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-6">Configuración de Pagos</h2>
+            <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <i class="fab fa-paypal text-blue-600 mr-3"></i>
+                Configuración de PayPal
+            </h2>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Cuenta Principal de PayPal -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">Cuenta Principal de PayPal</label>
                     <input type="email" name="paypal_account" 
                            value="<?php echo e($config['paypal_account'] ?? ''); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                           placeholder="pagos@camara.com">
-                    <p class="text-sm text-gray-500 mt-1">Email de la cuenta de PayPal para recibir pagos</p>
+                           placeholder="webmaster@impactosdigitales.com">
+                    <p class="text-sm text-gray-500 mt-1">Cuenta de PayPal para recibir los pagos del sistema</p>
                 </div>
+
+                <!-- Entorno de PayPal -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Entorno de PayPal</label>
+                    <select name="paypal_mode" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="sandbox" <?php echo ($config['paypal_mode'] ?? 'sandbox') === 'sandbox' ? 'selected' : ''; ?>>Sandbox (Pruebas)</option>
+                        <option value="live" <?php echo ($config['paypal_mode'] ?? '') === 'live' ? 'selected' : ''; ?>>Live (Producción)</option>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">Entorno para las transacciones de PayPal</p>
+                </div>
+
+                <!-- Client ID -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Client ID (ID de Cliente)</label>
+                    <input type="text" name="paypal_client_id" 
+                           value="<?php echo e($config['paypal_client_id'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                           placeholder="AZd7a_Vpfv6vuzd1CKF3e5a1OPu4jcKOGzLkwe0QYfwNVdEzjUnOZKnf0Oz">
+                    <p class="text-sm text-gray-500 mt-1">ID de cliente de la aplicación PayPal</p>
+                </div>
+
+                <!-- Client Secret -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Client Secret (Secreto del Cliente)</label>
+                    <input type="password" name="paypal_secret" 
+                           value="<?php echo e($config['paypal_secret'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                           placeholder="••••••••••••••••••••••••••••••••••••">
+                    <p class="text-sm text-gray-500 mt-1">Secreto del cliente de la aplicación PayPal</p>
+                </div>
+
+                <!-- PayPal Plan ID - Mensual -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">PayPal Plan ID - Mensual</label>
+                    <input type="text" name="paypal_plan_id_monthly" 
+                           value="<?php echo e($config['paypal_plan_id_monthly'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                           placeholder="P-XXXXXXXXXXXX">
+                    <p class="text-sm text-gray-500 mt-1">ID del plan de suscripción mensual en PayPal</p>
+                </div>
+
+                <!-- PayPal Plan ID - Anual -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">PayPal Plan ID - Anual</label>
+                    <input type="text" name="paypal_plan_id_annual" 
+                           value="<?php echo e($config['paypal_plan_id_annual'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                           placeholder="P-YYYYYYYYYYYY">
+                    <p class="text-sm text-gray-500 mt-1">ID del plan de suscripción anual en PayPal</p>
+                </div>
+
+                <!-- Webhook URL -->
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">Webhook URL</label>
+                    <input type="url" name="paypal_webhook_url" 
+                           value="<?php echo e($config['paypal_webhook_url'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           placeholder="https://yourdomain.com/webhook/paypal">
+                    <p class="text-sm text-gray-500 mt-1">URL para recibir notificaciones de PayPal sobre cambios en suscripciones</p>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>Nota:</strong> Para obtener las credenciales de PayPal, accede al 
+                    <a href="https://developer.paypal.com/dashboard/" target="_blank" class="underline font-semibold">
+                        Dashboard de Desarrolladores de PayPal
+                    </a> 
+                    y crea una aplicación. Usa el modo Sandbox para pruebas y Live para producción.
+                </p>
             </div>
         </div>
 

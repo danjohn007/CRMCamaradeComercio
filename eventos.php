@@ -43,18 +43,36 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Obtener datos de empresa si existe
                 $empresa_data = null;
+                $es_empresa_activa = false;
                 if ($user['empresa_id']) {
                     $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
                     $stmt->execute([$user['empresa_id']]);
                     $empresa_data = $stmt->fetch();
+                    $es_empresa_activa = ($empresa_data && $empresa_data['activo'] == 1);
                 }
+                
+                // Determinar si requiere pago
+                $requiere_pago = false;
+                $es_boleto_gratis = false;
+                $monto_total = 0;
+                
+                if ($evento['costo'] > 0) {
+                    // Si la empresa está activa (afiliada), el boleto es gratis
+                    $es_boleto_gratis = $es_empresa_activa;
+                    // Si no es empresa activa, requiere pago
+                    $requiere_pago = !$es_boleto_gratis;
+                    $monto_total = $requiere_pago ? $evento['costo'] : 0;
+                }
+                
+                // Determinar estado inicial de pago
+                $estado_pago_inicial = $requiere_pago ? 'PENDIENTE' : 'SIN_PAGO';
                 
                 // Inscribir con todos los datos necesarios
                 $stmt = $db->prepare("
                     INSERT INTO eventos_inscripciones 
                     (evento_id, usuario_id, empresa_id, nombre_invitado, email_invitado, 
-                     razon_social_invitado, codigo_qr, estado, boletos_solicitados) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO', 1)
+                     razon_social_invitado, codigo_qr, estado, boletos_solicitados, estado_pago, monto_pagado) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO', 1, ?, ?)
                 ");
                 $stmt->execute([
                     $id, 
@@ -63,7 +81,9 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user['nombre'],
                     $user['email'],
                     $empresa_data['razon_social'] ?? null,
-                    $codigo_qr
+                    $codigo_qr,
+                    $estado_pago_inicial,
+                    $monto_total
                 ]);
                 
                 $inscripcion_id = $db->lastInsertId();
@@ -78,26 +98,37 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $inscripcion = $stmt->fetch();
                 
                 // Generar y guardar imagen QR
-                try {
-                    $qrCodePath = QRCodeGenerator::saveQRImage(
-                        BASE_URL . '/boleto_digital.php?codigo=' . $codigo_qr,
-                        $codigo_qr
-                    );
-                    
-                    // Enviar email de confirmación con boleto digital
-                    EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
-                    
-                    // Actualizar que el boleto fue enviado
-                    $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
-                    $stmt->execute([$inscripcion_id]);
-                    
-                    $success = "¡Inscripción exitosa! Se ha enviado un correo de confirmación con tu boleto digital. ";
-                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
-                } catch (Exception $e) {
-                    // Si falla el envío de email, aún así la inscripción fue exitosa
-                    $success = "¡Inscripción exitosa! ";
-                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
-                    error_log("Error al enviar email de confirmación: " . $e->getMessage());
+                $qrCodePath = QRCodeGenerator::saveQRImage(
+                    BASE_URL . '/boleto_digital.php?codigo=' . $codigo_qr,
+                    $codigo_qr
+                );
+                
+                // Si no requiere pago, enviar boleto inmediatamente
+                if (!$requiere_pago) {
+                    try {
+                        // Enviar email de confirmación con boleto digital
+                        EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+                        
+                        // Actualizar que el boleto fue enviado
+                        $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
+                        $stmt->execute([$inscripcion_id]);
+                        
+                        if ($es_boleto_gratis) {
+                            $success = "¡Inscripción exitosa! Como empresa afiliada, tu boleto es gratuito. Se ha enviado un correo de confirmación con tu boleto digital. ";
+                        } else {
+                            $success = "¡Inscripción exitosa! Este evento es gratuito. Se ha enviado un correo de confirmación con tu boleto digital. ";
+                        }
+                        $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
+                    } catch (Exception $e) {
+                        // Si falla el envío de email, aún así la inscripción fue exitosa
+                        $success = "¡Inscripción exitosa! ";
+                        $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
+                        error_log("Error al enviar email de confirmación: " . $e->getMessage());
+                    }
+                } else {
+                    // Requiere pago
+                    $success = "¡Registro exitoso! Para completar tu inscripción y obtener tu boleto, por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong>. ";
+                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ir a Pagar</a>";
                 }
                 
                 // Cambiar acción a 'view' para mostrar la página del evento con el mensaje

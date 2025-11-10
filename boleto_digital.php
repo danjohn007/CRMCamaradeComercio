@@ -47,8 +47,16 @@ if (empty($codigo)) {
     if (!$data) {
         $error = 'Boleto no encontrado';
     } else {
-        $inscripcion = $data;
-        $evento = $data;
+        // Verificar si el evento requiere pago y si está pagado
+        if ($data['costo'] > 0 && $data['estado_pago'] === 'PENDIENTE') {
+            $error = 'Este boleto requiere pago. Por favor complete el pago para poder imprimirlo.';
+            $inscripcion = $data; // Guardar para mostrar info de pago
+        } elseif ($data['costo'] > 0 && $data['estado_pago'] === 'CANCELADO') {
+            $error = 'El pago de este boleto fue cancelado. Por favor contacte al administrador.';
+        } else {
+            $inscripcion = $data;
+            $evento = $data;
+        }
     }
 }
 ?>
@@ -112,10 +120,88 @@ if (empty($codigo)) {
     <?php if ($error): ?>
     <div class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-            <i class="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">Error</h1>
-            <p class="text-gray-600"><?php echo e($error); ?></p>
-            <a href="<?php echo BASE_URL; ?>" class="mt-6 inline-block bg-primary text-white px-6 py-3 rounded-lg hover:opacity-90">
+            <i class="fas fa-exclamation-triangle text-yellow-500 text-6xl mb-4"></i>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Pago Pendiente</h1>
+            <p class="text-gray-600 mb-4"><?php echo e($error); ?></p>
+            
+            <?php if (isset($inscripcion) && $inscripcion['estado_pago'] === 'PENDIENTE'): ?>
+                <!-- Información del pago -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
+                    <p class="text-sm text-gray-700 mb-2">
+                        <strong>Evento:</strong> <?php echo e($inscripcion['titulo']); ?>
+                    </p>
+                    <p class="text-sm text-gray-700 mb-2">
+                        <strong>Boletos:</strong> <?php echo $inscripcion['boletos_solicitados'] ?? 1; ?>
+                    </p>
+                    <p class="text-sm text-gray-700 mb-2">
+                        <strong>Monto a pagar:</strong> $<?php echo number_format($inscripcion['monto_pagado'], 2); ?> MXN
+                    </p>
+                </div>
+                
+                <!-- Botón de PayPal -->
+                <div class="bg-white p-4 rounded-lg border-2 border-blue-300 mb-4">
+                    <p class="text-sm text-gray-600 mb-3">Complete el pago para poder imprimir su boleto:</p>
+                    <div id="paypal-button-container"></div>
+                </div>
+                
+                <script src="https://www.paypal.com/sdk/js?client-id=<?php 
+                    require_once __DIR__ . '/app/helpers/paypal.php';
+                    echo PayPalHelper::getClientId();
+                ?>&currency=MXN&locale=es_MX"></script>
+                
+                <script>
+                paypal.Buttons({
+                    createOrder: function(data, actions) {
+                        document.getElementById('paypal-button-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i><p class="text-sm text-gray-600 mt-2">Procesando...</p></div>';
+                        
+                        return fetch('<?php echo BASE_URL; ?>/api/crear_orden_paypal_evento.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                inscripcion_id: <?php echo $inscripcion['id']; ?>
+                            })
+                        })
+                        .then(function(res) {
+                            return res.json();
+                        })
+                        .then(function(orderData) {
+                            if (orderData.success) {
+                                return orderData.order_id;
+                            } else {
+                                throw new Error(orderData.error || 'Error al crear la orden');
+                            }
+                        })
+                        .catch(function(err) {
+                            alert('Error: ' + err.message);
+                            location.reload();
+                        });
+                    },
+                    onApprove: function(data, actions) {
+                        window.location.href = '<?php echo BASE_URL; ?>/api/paypal_success_evento.php?token=' + data.orderID + '&inscripcion_id=<?php echo $inscripcion['id']; ?>';
+                    },
+                    onCancel: function(data) {
+                        alert('Pago cancelado. Puedes intentar nuevamente en cualquier momento.');
+                        location.reload();
+                    },
+                    onError: function(err) {
+                        console.error('Error de PayPal:', err);
+                        alert('Ocurrió un error al procesar el pago. Por favor intenta nuevamente.');
+                        location.reload();
+                    },
+                    style: {
+                        layout: 'vertical',
+                        color: 'blue',
+                        shape: 'rect',
+                        label: 'pay',
+                        height: 45
+                    }
+                }).render('#paypal-button-container');
+                </script>
+            <?php endif; ?>
+            
+            <a href="<?php echo BASE_URL; ?>" class="mt-4 inline-block bg-primary text-white px-6 py-3 rounded-lg hover:opacity-90">
                 Volver al inicio
             </a>
         </div>
