@@ -181,17 +181,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Generar código QR único
         $codigo_qr = QRCodeGenerator::generateUniqueCode();
         
+        // Determinar si el evento requiere pago
+        $requiere_pago = false;
+        $es_boleto_gratis = false;
+        
+        if ($evento['costo'] > 0) {
+            // Si la empresa está activa (afiliada), el boleto es gratis
+            if ($empresa_id) {
+                $stmt = $db->prepare("SELECT activo FROM empresas WHERE id = ? AND activo = 1");
+                $stmt->execute([$empresa_id]);
+                $empresa_activa = $stmt->fetch();
+                $es_boleto_gratis = ($empresa_activa !== false);
+            }
+            
+            // Si no es empresa activa, requiere pago
+            $requiere_pago = !$es_boleto_gratis;
+        }
+        
+        // Calcular monto a pagar
+        $monto_total = $requiere_pago ? ($evento['costo'] * $boletos) : 0;
+        
+        // Determinar estado inicial de pago
+        $estado_pago_inicial = $requiere_pago ? 'PENDIENTE' : 'SIN_PAGO';
+        
         // Registrar inscripción
         $stmt = $db->prepare("
             INSERT INTO eventos_inscripciones 
             (evento_id, usuario_id, empresa_id, nombre_invitado, razon_social_invitado, email_invitado, 
-             whatsapp_invitado, rfc_invitado, boletos_solicitados, es_invitado, codigo_qr, estado) 
-            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO')
+             whatsapp_invitado, rfc_invitado, boletos_solicitados, es_invitado, codigo_qr, estado, estado_pago, monto_pagado) 
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO', ?, ?)
         ");
         
         $stmt->execute([
             $evento_id, $empresa_id, $nombre, $razon_social, $email, 
-            $whatsapp, $rfc, $boletos, $es_invitado, $codigo_qr
+            $whatsapp, $rfc, $boletos, $es_invitado, $codigo_qr, $estado_pago_inicial, $monto_total
         ]);
         
         $inscripcion_id = $db->lastInsertId();
@@ -211,26 +234,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $codigo_qr
         );
         
-        // Enviar email de confirmación con boleto digital
-        try {
-            EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
-            
-            // Actualizar que el boleto fue enviado
-            $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
-            $stmt->execute([$inscripcion_id]);
-        } catch (Exception $e) {
-            // Log error but don't fail registration
-            error_log("Error sending email: " . $e->getMessage());
+        // Si no requiere pago, enviar boleto inmediatamente
+        if (!$requiere_pago) {
+            try {
+                EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+                
+                // Actualizar que el boleto fue enviado
+                $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
+                $stmt->execute([$inscripcion_id]);
+            } catch (Exception $e) {
+                // Log error but don't fail registration
+                error_log("Error sending email: " . $e->getMessage());
+            }
         }
         
         // Regenerar captcha
         $_SESSION['captcha_evento_num1'] = rand(1, 10);
         $_SESSION['captcha_evento_num2'] = rand(1, 10);
         
-        $success = "¡Registro exitoso! Se han confirmado {$boletos} boleto(s) para el evento. Recibirá un correo de confirmación con su boleto digital (puede llegar a spam).";
-        
-        // Agregar enlace para imprimir boleto
-        $success .= " <a href='" . BASE_URL . "/boleto_digital.php?codigo={$codigo_qr}' target='_blank' class='underline font-bold'>Imprimir Boleto Ahora</a>";
+        // Mensaje de éxito según si requiere pago o no
+        if ($requiere_pago) {
+            $success = "¡Registro exitoso! Para completar tu inscripción y obtener tus {$boletos} boleto(s), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
+            
+            // Guardar inscripcion_id para mostrar botón de pago
+            $_SESSION['pending_payment_inscripcion_id'] = $inscripcion_id;
+            $_SESSION['pending_payment_monto'] = $monto_total;
+            $_SESSION['pending_payment_codigo_qr'] = $codigo_qr;
+        } else {
+            if ($es_boleto_gratis) {
+                $success = "¡Registro exitoso! Como empresa afiliada, tus {$boletos} boleto(s) son gratuitos. Se ha enviado un correo de confirmación con tu boleto digital (puede llegar a spam).";
+            } else {
+                $success = "¡Registro exitoso! Este evento es gratuito. Se han confirmado {$boletos} boleto(s) y recibirás un correo de confirmación con tu boleto digital (puede llegar a spam).";
+            }
+            
+            // Agregar enlace para imprimir boleto
+            $success .= " <a href='" . BASE_URL . "/boleto_digital.php?codigo={$codigo_qr}' target='_blank' class='underline font-bold'>Imprimir Boleto Ahora</a>";
+        }
         
         // Limpiar formulario
         $empresa_data = null;
@@ -312,10 +351,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <?php if ($success): ?>
                 <div class="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded-lg">
-                    <div class="flex items-center">
+                    <div class="flex items-center mb-3">
                         <i class="fas fa-check-circle text-green-500 text-2xl mr-3"></i>
                         <div class="text-green-700 font-semibold"><?php echo $success; /* Contains safe HTML link */ ?></div>
                     </div>
+                    
+                    <?php if (isset($_SESSION['pending_payment_inscripcion_id'])): ?>
+                        <!-- PayPal Payment Button -->
+                        <div class="mt-4 p-4 bg-white rounded-lg border-2 border-blue-300">
+                            <h3 class="text-lg font-bold text-gray-800 mb-3">
+                                <i class="fab fa-paypal text-blue-600 mr-2"></i>
+                                Pagar con PayPal
+                            </h3>
+                            <p class="text-sm text-gray-600 mb-4">
+                                Haz clic en el botón de PayPal para completar tu pago de forma segura. 
+                                Una vez completado el pago, recibirás tu boleto digital por correo electrónico.
+                            </p>
+                            <div id="paypal-button-container"></div>
+                            <p class="text-xs text-gray-500 mt-3">
+                                <i class="fas fa-lock mr-1"></i>
+                                Pago seguro procesado por PayPal
+                            </p>
+                        </div>
+                        
+                        <script src="https://www.paypal.com/sdk/js?client-id=<?php 
+                            require_once __DIR__ . '/app/helpers/paypal.php';
+                            echo PayPalHelper::getClientId();
+                        ?>&currency=MXN&locale=es_MX"></script>
+                        
+                        <script>
+                        paypal.Buttons({
+                            createOrder: function(data, actions) {
+                                // Mostrar loading
+                                document.getElementById('paypal-button-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i><p class="text-sm text-gray-600 mt-2">Procesando...</p></div>';
+                                
+                                // Crear orden en el servidor
+                                return fetch('<?php echo BASE_URL; ?>/api/crear_orden_paypal_evento.php', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        inscripcion_id: <?php echo $_SESSION['pending_payment_inscripcion_id']; ?>
+                                    })
+                                })
+                                .then(function(res) {
+                                    return res.json();
+                                })
+                                .then(function(orderData) {
+                                    if (orderData.success) {
+                                        return orderData.order_id;
+                                    } else {
+                                        throw new Error(orderData.error || 'Error al crear la orden');
+                                    }
+                                })
+                                .catch(function(err) {
+                                    alert('Error: ' + err.message);
+                                    location.reload();
+                                });
+                            },
+                            onApprove: function(data, actions) {
+                                // Redirigir a la página de éxito
+                                window.location.href = '<?php echo BASE_URL; ?>/api/paypal_success_evento.php?token=' + data.orderID + '&inscripcion_id=<?php echo $_SESSION['pending_payment_inscripcion_id']; ?>';
+                            },
+                            onCancel: function(data) {
+                                alert('Pago cancelado. Puedes intentar nuevamente en cualquier momento.');
+                                location.reload();
+                            },
+                            onError: function(err) {
+                                console.error('Error de PayPal:', err);
+                                alert('Ocurrió un error al procesar el pago. Por favor intenta nuevamente.');
+                                location.reload();
+                            },
+                            style: {
+                                layout: 'vertical',
+                                color: 'blue',
+                                shape: 'rect',
+                                label: 'pay',
+                                height: 45
+                            }
+                        }).render('#paypal-button-container');
+                        </script>
+                        
+                        <?php 
+                        // Limpiar la sesión después de mostrar el botón
+                        // No lo hacemos aquí para que el botón siga disponible si recargan la página
+                        ?>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
