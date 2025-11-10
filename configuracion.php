@@ -364,13 +364,20 @@ include __DIR__ . '/app/views/layouts/header.php';
 
             <!-- Info Box -->
             <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p class="text-sm text-blue-800">
+                <p class="text-sm text-blue-800 mb-3">
                     <i class="fas fa-info-circle mr-2"></i>
                     <strong>Nota:</strong> Para obtener las credenciales de PayPal, accede al 
                     <a href="https://developer.paypal.com/dashboard/" target="_blank" class="underline font-semibold">
                         Dashboard de Desarrolladores de PayPal
                     </a> 
                     y crea una aplicación. Usa el modo Sandbox para pruebas y Live para producción.
+                </p>
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <strong>Importante:</strong> Asegúrate de usar las credenciales correctas según el entorno seleccionado:
+                    <br>• <strong>Sandbox:</strong> Las credenciales deben ser de una aplicación de prueba (sandbox)
+                    <br>• <strong>Live:</strong> Las credenciales deben ser de una aplicación de producción (live)
+                    <br>Las credenciales de un entorno NO funcionarán en el otro.
                 </p>
             </div>
         </div>
