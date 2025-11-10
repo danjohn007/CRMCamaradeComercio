@@ -181,13 +181,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Generar código QR único
         $codigo_qr = QRCodeGenerator::generateUniqueCode();
         
+        // Determinar el precio efectivo del evento (preventa o regular)
+        $precio_efectivo = $evento['costo'];
+        $ahora = new DateTime();
+        
+        // Si hay precio de preventa y aún no pasó la fecha límite, usar precio de preventa
+        if (isset($evento['precio_preventa']) && $evento['precio_preventa'] > 0 && 
+            !empty($evento['fecha_limite_preventa'])) {
+            $fecha_limite = new DateTime($evento['fecha_limite_preventa']);
+            if ($ahora <= $fecha_limite) {
+                $precio_efectivo = $evento['precio_preventa'];
+            }
+        }
+        
         // Determinar si el evento requiere pago
         $requiere_pago = false;
         $es_boleto_gratis = false;
         $boletos_gratis = 0;
         $boletos_a_pagar = $boletos; // Por defecto, todos los boletos requieren pago
         
-        if ($evento['costo'] > 0) {
+        if ($precio_efectivo > 0) {
             // Si la empresa está activa (afiliada), solo 1 boleto es gratis
             if ($empresa_id) {
                 $stmt = $db->prepare("SELECT activo FROM empresas WHERE id = ? AND activo = 1");
@@ -208,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         // Calcular monto a pagar (solo los boletos adicionales si la empresa está activa)
-        $monto_total = $requiere_pago ? ($evento['costo'] * $boletos_a_pagar) : 0;
+        $monto_total = $requiere_pago ? ($precio_efectivo * $boletos_a_pagar) : 0;
         
         // Determinar estado inicial de pago
         $estado_pago_inicial = $requiere_pago ? 'PENDIENTE' : 'SIN_PAGO';
@@ -243,18 +256,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $codigo_qr
         );
         
-        // Si no requiere pago, enviar boleto inmediatamente
-        if (!$requiere_pago) {
-            try {
-                EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+        // Enviar email de confirmación según el estado del pago
+        try {
+            if (!$requiere_pago) {
+                // Evento gratuito o empresa afiliada con 1 boleto - enviar confirmación con boleto
+                EmailHelper::sendEventRegistrationConfirmation($inscripcion, $evento, false, 0, $qrCodePath);
                 
                 // Actualizar que el boleto fue enviado
                 $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
                 $stmt->execute([$inscripcion_id]);
-            } catch (Exception $e) {
-                // Log error but don't fail registration
-                error_log("Error sending email: " . $e->getMessage());
+            } else {
+                // Requiere pago - enviar confirmación con link de pago
+                // Si es empresa afiliada y tiene boleto gratis, enviar el primer boleto también
+                $qr_path_for_email = ($es_boleto_gratis && $boletos_gratis > 0) ? $qrCodePath : null;
+                EmailHelper::sendEventRegistrationConfirmation($inscripcion, $evento, true, $monto_total, $qr_path_for_email);
             }
+        } catch (Exception $e) {
+            // Log error but don't fail registration
+            error_log("Error sending confirmation email: " . $e->getMessage());
         }
         
         // Regenerar captcha
@@ -264,9 +283,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Mensaje de éxito según si requiere pago o no
         if ($requiere_pago) {
             if ($es_boleto_gratis && $boletos_gratis > 0) {
-                $success = "¡Registro exitoso! Como empresa afiliada, tu primer boleto es gratuito. Para completar tu inscripción y obtener " . ($boletos - $boletos_gratis) . " boleto(s) adicional(es), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
+                $success = "¡Registro exitoso! Como empresa afiliada, tu primer boleto es gratuito y se ha enviado a tu correo. Para obtener " . ($boletos - $boletos_gratis) . " boleto(s) adicional(es), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
             } else {
-                $success = "¡Registro exitoso! Para completar tu inscripción y obtener tus {$boletos} boleto(s), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
+                $success = "¡Registro exitoso! Se ha enviado un correo de confirmación. Para completar tu inscripción y obtener tus {$boletos} boleto(s), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
             }
             
             // Guardar inscripcion_id para mostrar botón de pago
@@ -276,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } else {
             if ($es_boleto_gratis) {
                 if ($boletos > 1) {
-                    $success = "¡Registro exitoso! Como empresa afiliada, tu primer boleto es gratuito. Se han confirmado {$boletos} boleto(s) y recibirás un correo de confirmación con tu boleto digital (puede llegar a spam).";
+                    $success = "¡Registro exitoso! Como empresa afiliada, tu primer boleto es gratuito. Se han confirmado {$boletos} boleto(s) y se ha enviado un correo de confirmación con tu boleto digital (puede llegar a spam).";
                 } else {
                     $success = "¡Registro exitoso! Como empresa afiliada, tu boleto es gratuito. Se ha enviado un correo de confirmación con tu boleto digital (puede llegar a spam).";
                 }
@@ -357,10 +376,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         </div>
                         <?php endif; ?>
                         <?php if ($evento['costo'] > 0): ?>
-                        <div class="flex items-center text-gray-700">
-                            <i class="fas fa-dollar-sign mr-3 text-green-600"></i>
-                            <span class="font-semibold">$<?php echo number_format($evento['costo'], 2); ?> MXN</span>
-                        </div>
+                            <?php
+                            // Determinar el precio efectivo (preventa o regular)
+                            $precio_display = $evento['costo'];
+                            $es_preventa = false;
+                            $ahora_display = new DateTime();
+                            
+                            if (isset($evento['precio_preventa']) && $evento['precio_preventa'] > 0 && 
+                                !empty($evento['fecha_limite_preventa'])) {
+                                $fecha_limite_display = new DateTime($evento['fecha_limite_preventa']);
+                                if ($ahora_display <= $fecha_limite_display) {
+                                    $precio_display = $evento['precio_preventa'];
+                                    $es_preventa = true;
+                                }
+                            }
+                            ?>
+                            <div class="flex items-center text-gray-700">
+                                <i class="fas fa-<?php echo $es_preventa ? 'tag' : 'dollar-sign'; ?> mr-3 text-green-600"></i>
+                                <div>
+                                    <span class="font-semibold"><?php echo $es_preventa ? '¡PREVENTA! ' : ''; ?>$<?php echo number_format($precio_display, 2); ?> MXN</span>
+                                    <?php if ($es_preventa): ?>
+                                        <br><span class="text-sm text-gray-500 line-through">$<?php echo number_format($evento['costo'], 2); ?> MXN</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                         <?php else: ?>
                         <div class="flex items-center text-gray-700">
                             <i class="fas fa-gift mr-3 text-green-600"></i>

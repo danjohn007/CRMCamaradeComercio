@@ -72,7 +72,7 @@ try {
             error_log("Error registrando auditoría: " . $e->getMessage());
         }
         
-        // Enviar email de confirmación si aún no se envió
+        // Enviar email con boletos después del pago
         if (!$inscripcion['boleto_enviado']) {
             try {
                 require_once __DIR__ . '/../app/helpers/qrcode.php';
@@ -85,10 +85,22 @@ try {
                 $evento = [
                     'titulo' => $inscripcion['titulo'],
                     'fecha_inicio' => $inscripcion['fecha_inicio'],
+                    'fecha_fin' => $inscripcion['fecha_fin'] ?? $inscripcion['fecha_inicio'],
                     'ubicacion' => $inscripcion['ubicacion']
                 ];
                 
-                EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+                // Determinar cuántos boletos enviar según si es empresa afiliada
+                $es_empresa_afiliada = !empty($inscripcion['empresa_id']);
+                $boletos_total = $inscripcion['boletos_solicitados'] ?? 1;
+                
+                if ($es_empresa_afiliada && $boletos_total > 1) {
+                    // Empresa afiliada: enviar solo los boletos adicionales (ya tiene el primero gratis)
+                    $boletos_enviados = $boletos_total - 1;
+                    EmailHelper::sendEventTicketAfterPayment($inscripcion, $evento, $qrCodePath, $boletos_enviados);
+                } else {
+                    // No es empresa afiliada: enviar todos los boletos
+                    EmailHelper::sendEventTicketAfterPayment($inscripcion, $evento, $qrCodePath, $boletos_total);
+                }
                 
                 $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
                 $stmt->execute([$inscripcion_id]);
