@@ -249,9 +249,9 @@ if (isset($_GET['success'])) {
                 $telefono_contacto = '';
                 $horario_atencion = '';
                 try {
-                    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('email_contacto', 'telefono_contacto', 'horario_atencion')");
+                    $stmt = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('email_sistema', 'telefono_contacto', 'horario_atencion')");
                     while ($row = $stmt->fetch()) {
-                        if ($row['clave'] === 'email_contacto') {
+                        if ($row['clave'] === 'email_sistema') {
                             $email_contacto = $row['valor'];
                         } elseif ($row['clave'] === 'telefono_contacto') {
                             $telefono_contacto = $row['valor'];

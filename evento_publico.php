@@ -184,22 +184,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Determinar si el evento requiere pago
         $requiere_pago = false;
         $es_boleto_gratis = false;
+        $boletos_gratis = 0;
+        $boletos_a_pagar = $boletos; // Por defecto, todos los boletos requieren pago
         
         if ($evento['costo'] > 0) {
-            // Si la empresa está activa (afiliada), el boleto es gratis
+            // Si la empresa está activa (afiliada), solo 1 boleto es gratis
             if ($empresa_id) {
                 $stmt = $db->prepare("SELECT activo FROM empresas WHERE id = ? AND activo = 1");
                 $stmt->execute([$empresa_id]);
                 $empresa_activa = $stmt->fetch();
-                $es_boleto_gratis = ($empresa_activa !== false);
+                if ($empresa_activa !== false) {
+                    $boletos_gratis = 1; // Solo 1 boleto gratis para empresas activas
+                    $es_boleto_gratis = true;
+                }
             }
             
-            // Si no es empresa activa, requiere pago
-            $requiere_pago = !$es_boleto_gratis;
+            // Calcular boletos que requieren pago
+            $boletos_a_pagar = max(0, $boletos - $boletos_gratis);
+            $requiere_pago = ($boletos_a_pagar > 0);
+        } else {
+            // Si el evento es gratuito, no se requiere pago
+            $boletos_a_pagar = 0;
         }
         
-        // Calcular monto a pagar
-        $monto_total = $requiere_pago ? ($evento['costo'] * $boletos) : 0;
+        // Calcular monto a pagar (solo los boletos adicionales si la empresa está activa)
+        $monto_total = $requiere_pago ? ($evento['costo'] * $boletos_a_pagar) : 0;
         
         // Determinar estado inicial de pago
         $estado_pago_inicial = $requiere_pago ? 'PENDIENTE' : 'SIN_PAGO';
@@ -254,7 +263,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         // Mensaje de éxito según si requiere pago o no
         if ($requiere_pago) {
-            $success = "¡Registro exitoso! Para completar tu inscripción y obtener tus {$boletos} boleto(s), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
+            if ($es_boleto_gratis && $boletos_gratis > 0) {
+                $success = "¡Registro exitoso! Como empresa afiliada, tu primer boleto es gratuito. Para completar tu inscripción y obtener " . ($boletos - $boletos_gratis) . " boleto(s) adicional(es), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
+            } else {
+                $success = "¡Registro exitoso! Para completar tu inscripción y obtener tus {$boletos} boleto(s), por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong> usando el botón de PayPal a continuación.";
+            }
             
             // Guardar inscripcion_id para mostrar botón de pago
             $_SESSION['pending_payment_inscripcion_id'] = $inscripcion_id;
@@ -262,7 +275,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $_SESSION['pending_payment_codigo_qr'] = $codigo_qr;
         } else {
             if ($es_boleto_gratis) {
-                $success = "¡Registro exitoso! Como empresa afiliada, tus {$boletos} boleto(s) son gratuitos. Se ha enviado un correo de confirmación con tu boleto digital (puede llegar a spam).";
+                if ($boletos > 1) {
+                    $success = "¡Registro exitoso! Como empresa afiliada, tu primer boleto es gratuito. Se han confirmado {$boletos} boleto(s) y recibirás un correo de confirmación con tu boleto digital (puede llegar a spam).";
+                } else {
+                    $success = "¡Registro exitoso! Como empresa afiliada, tu boleto es gratuito. Se ha enviado un correo de confirmación con tu boleto digital (puede llegar a spam).";
+                }
             } else {
                 $success = "¡Registro exitoso! Este evento es gratuito. Se han confirmado {$boletos} boleto(s) y recibirás un correo de confirmación con tu boleto digital (puede llegar a spam).";
             }
@@ -299,9 +316,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <!-- Encabezado del evento -->
             <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
                 <?php if ($evento['imagen']): ?>
-                <img src="<?php echo BASE_URL . '/public/uploads/' . e($evento['imagen']); ?>" 
-                     alt="<?php echo e($evento['titulo']); ?>" 
-                     class="w-full h-64 object-cover">
+                <div class="relative">
+                    <img src="<?php echo BASE_URL . '/public/uploads/' . e($evento['imagen']); ?>" 
+                         alt="<?php echo e($evento['titulo']); ?>" 
+                         class="w-full h-auto object-contain max-h-96">
+                    <!-- Iconos de guardar y compartir -->
+                    <div class="absolute top-4 right-4 flex gap-2">
+                        <button onclick="saveImage()" 
+                                class="bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+                                title="Guardar imagen">
+                            <i class="fas fa-download text-gray-700"></i>
+                        </button>
+                        <button onclick="shareEvent()" 
+                                class="bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-110"
+                                title="Compartir evento">
+                            <i class="fas fa-share-alt text-gray-700"></i>
+                        </button>
+                    </div>
+                </div>
                 <?php endif; ?>
                 
                 <div class="p-8">
@@ -665,5 +697,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             </div>
         </div>
     </div>
+    
+    <script>
+    // Función para guardar la imagen del evento
+    function saveImage() {
+        const imgElement = document.querySelector('img[alt="<?php echo addslashes(e($evento['titulo'])); ?>"]');
+        if (imgElement) {
+            const link = document.createElement('a');
+            link.href = imgElement.src;
+            link.download = '<?php echo preg_replace('/[^a-zA-Z0-9_-]/', '_', $evento['titulo']); ?>.jpg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+    
+    // Función para compartir el evento
+    function shareEvent() {
+        const eventUrl = window.location.href;
+        const eventTitle = '<?php echo addslashes(e($evento['titulo'])); ?>';
+        const eventText = 'Te invito a este evento: ' + eventTitle;
+        
+        // Intentar usar la Web Share API si está disponible
+        if (navigator.share) {
+            navigator.share({
+                title: eventTitle,
+                text: eventText,
+                url: eventUrl
+            }).catch((error) => console.log('Error sharing:', error));
+        } else {
+            // Fallback: copiar al portapapeles
+            const textarea = document.createElement('textarea');
+            textarea.value = eventText + '\n' + eventUrl;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                alert('¡Enlace copiado al portapapeles! Puedes compartirlo por WhatsApp, Email, etc.');
+            } catch (err) {
+                alert('No se pudo copiar automáticamente. URL del evento: ' + eventUrl);
+            }
+            document.body.removeChild(textarea);
+        }
+    }
+    </script>
 </body>
 </html>

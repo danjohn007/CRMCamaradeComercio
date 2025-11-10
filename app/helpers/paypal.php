@@ -50,15 +50,28 @@ class PayPalHelper {
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
         
+        if ($curl_error) {
+            error_log("PayPal cURL Error: $curl_error");
+            throw new Exception('PayPal connection error: ' . $curl_error);
+        }
+        
         if ($http_code !== 200) {
-            error_log("PayPal OAuth Error: HTTP $http_code - $response");
-            throw new Exception('Failed to get PayPal access token');
+            error_log("PayPal OAuth Error: HTTP $http_code - Mode: " . self::$mode . " - Response: $response");
+            $error_data = json_decode($response, true);
+            $error_message = $error_data['error_description'] ?? $error_data['message'] ?? 'Failed to get PayPal access token';
+            throw new Exception('PayPal authentication error: ' . $error_message);
         }
         
         $data = json_decode($response, true);
-        return $data['access_token'] ?? null;
+        if (!isset($data['access_token'])) {
+            error_log("PayPal OAuth Error: No access token in response - $response");
+            throw new Exception('Invalid PayPal response: no access token received');
+        }
+        
+        return $data['access_token'];
     }
     
     /**
@@ -115,11 +128,19 @@ class PayPalHelper {
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
         
+        if ($curl_error) {
+            error_log("PayPal cURL Error (Create Order): $curl_error");
+            throw new Exception('PayPal connection error: ' . $curl_error);
+        }
+        
         if ($http_code !== 201) {
-            error_log("PayPal Create Order Error: HTTP $http_code - $response");
-            throw new Exception('Failed to create PayPal order');
+            error_log("PayPal Create Order Error: HTTP $http_code - Mode: " . self::$mode . " - Response: $response");
+            $error_data = json_decode($response, true);
+            $error_message = $error_data['message'] ?? 'Failed to create PayPal order';
+            throw new Exception('PayPal order creation error: ' . $error_message);
         }
         
         return json_decode($response, true);
@@ -147,11 +168,19 @@ class PayPalHelper {
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
         
+        if ($curl_error) {
+            error_log("PayPal cURL Error (Capture Order): $curl_error");
+            throw new Exception('PayPal connection error: ' . $curl_error);
+        }
+        
         if ($http_code !== 201) {
-            error_log("PayPal Capture Order Error: HTTP $http_code - $response");
-            throw new Exception('Failed to capture PayPal order');
+            error_log("PayPal Capture Order Error: HTTP $http_code - Mode: " . self::$mode . " - Response: $response");
+            $error_data = json_decode($response, true);
+            $error_message = $error_data['message'] ?? 'Failed to capture PayPal order';
+            throw new Exception('PayPal capture error: ' . $error_message);
         }
         
         return json_decode($response, true);
@@ -178,11 +207,19 @@ class PayPalHelper {
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
         
+        if ($curl_error) {
+            error_log("PayPal cURL Error (Get Order): $curl_error");
+            throw new Exception('PayPal connection error: ' . $curl_error);
+        }
+        
         if ($http_code !== 200) {
-            error_log("PayPal Get Order Error: HTTP $http_code - $response");
-            throw new Exception('Failed to get PayPal order details');
+            error_log("PayPal Get Order Error: HTTP $http_code - Mode: " . self::$mode . " - Response: $response");
+            $error_data = json_decode($response, true);
+            $error_message = $error_data['message'] ?? 'Failed to get PayPal order details';
+            throw new Exception('PayPal order retrieval error: ' . $error_message);
         }
         
         return json_decode($response, true);

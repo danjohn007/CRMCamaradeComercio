@@ -77,9 +77,13 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log("Error in crear_orden_paypal_evento.php: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => $e->getMessage(),
+        'details' => 'Por favor verifica que las credenciales de PayPal estén configuradas correctamente en Configuración del Sistema.'
     ]);
 }
