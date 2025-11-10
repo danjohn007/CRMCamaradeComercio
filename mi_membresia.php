@@ -220,9 +220,21 @@ include __DIR__ . '/app/views/layouts/header.php';
                         <?php endif; ?>
                         
                         <?php 
-                        // Usar el partial de botones de membresía con funcionalidad real
-                        include __DIR__ . '/app/views/empresas/partials/membresia_buttons.php'; 
-                        ?>
+                        // Mostrar botón de PayPal para actualizar membresía
+                        if ($es_actual): ?>
+                            <!-- Botón deshabilitado para membresía actual -->
+                            <button disabled
+                                    class="w-full bg-gray-400 text-white px-4 py-3 rounded-lg cursor-not-allowed font-semibold">
+                                <i class="fas fa-check mr-2"></i>Membresía Actual
+                            </button>
+                        <?php else: ?>
+                            <!-- Botón para abrir modal de PayPal -->
+                            <button type="button"
+                                    onclick="abrirModalUpgrade(<?php echo $membresia['id']; ?>, '<?php echo addslashes($membresia['nombre']); ?>', <?php echo $membresia['costo']; ?>)"
+                                    class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                                <i class="fas fa-arrow-circle-up mr-2"></i>Actualizar con PayPal
+                            </button>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -249,18 +261,7 @@ include __DIR__ . '/app/views/layouts/header.php';
     <?php endif; ?>
 </div>
 
-<!-- 
-    NOTA: El modal de PayPal y su código JavaScript han sido comentados temporalmente.
-    Se mantienen aquí para referencia y posible reactivación futura.
-    El nuevo sistema utiliza formularios POST directos al endpoint update_membresia.php
-    
-    Para reactivar el modal de PayPal:
-    1. Descomentar el código HTML y JavaScript a continuación
-    2. Modificar membresia_buttons.php para usar onclick="abrirModalUpgrade(...)" en lugar de formularios POST
-    3. Verificar que la configuración de PayPal esté correcta en la tabla configuracion
--->
-
-<!--
+<!-- Modal de PayPal para Actualización de Membresía -->
 <div id="modalUpgrade" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
     <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-lg bg-white">
         <div class="flex justify-between items-center mb-4">
@@ -319,23 +320,35 @@ include __DIR__ . '/app/views/layouts/header.php';
 
 <script>
 let paypalButtonRendered = false;
+let currentMembresiaId = null;
 
 function abrirModalUpgrade(membresiaId, membresiaNombre, monto) {
+    console.log('Abriendo modal para membresía:', membresiaId, membresiaNombre, monto);
+    
     document.getElementById('nueva_membresia_id').value = membresiaId;
     document.getElementById('nueva_membresia_nombre').textContent = membresiaNombre;
     document.getElementById('monto_upgrade').textContent = '$' + parseFloat(monto).toFixed(2);
     
     if (typeof paypal === 'undefined') {
+        console.error('PayPal SDK no está cargado');
         showMessage('error', 'PayPal no está configurado correctamente. Contacte al administrador.');
         return;
     }
     
+    console.log('PayPal SDK cargado correctamente');
+    
     document.getElementById('modalUpgrade').classList.remove('hidden');
     
-    if (!paypalButtonRendered) {
-        renderPayPalButton(monto, membresiaId);
-        paypalButtonRendered = true;
-    }
+    // Limpiar botón anterior si existe
+    const container = document.getElementById('paypal-button-container');
+    container.innerHTML = '';
+    
+    // Guardar el ID de membresía actual
+    currentMembresiaId = membresiaId;
+    
+    // Renderizar nuevo botón de PayPal
+    console.log('Renderizando botón de PayPal...');
+    renderPayPalButton(monto, membresiaId);
 }
 
 function cerrarModalUpgrade() {
@@ -343,60 +356,112 @@ function cerrarModalUpgrade() {
 }
 
 function renderPayPalButton(monto, membresiaId) {
+    console.log('Iniciando renderizado de botón PayPal con monto:', monto, 'membresiaId:', membresiaId);
+    
+    // Mostrar mensaje de carga
+    showMessage('info', 'Preparando PayPal...');
+    
     paypal.Buttons({
-        createOrder: function(data, actions) {
-            return actions.order.create({
-                purchase_units: [{
-                    amount: {
-                        value: parseFloat(monto).toFixed(2),
-                        currency_code: 'MXN'
-                    },
-                    description: 'Actualización de Membresía - ' + document.getElementById('nueva_membresia_nombre').textContent
-                }]
-            });
-        },
-        onApprove: async function(data, actions) {
+        createOrder: async function(data, actions) {
+            console.log('createOrder llamado');
             try {
-                const order = await actions.order.capture();
+                console.log('Enviando petición a crear_orden_paypal_membresia.php');
                 
-                const response = await fetch('<?php echo BASE_URL; ?>/api/procesar_upgrade_membresia.php', {
+                // Crear orden usando nuestra API
+                const response = await fetch('<?php echo BASE_URL; ?>/api/crear_orden_paypal_membresia.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        membresia_id: membresiaId,
-                        paypal_order_id: order.id,
-                        monto: monto
+                        membresia_id: membresiaId
                     })
                 });
                 
+                console.log('Respuesta recibida:', response.status);
                 const result = await response.json();
+                console.log('Resultado parseado:', result);
                 
-                if (result.success) {
-                    showMessage('success', '¡Pago completado! Tu membresía ha sido actualizada.');
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                } else {
-                    throw new Error(result.error || 'Error al procesar la actualización');
+                if (!result.success) {
+                    console.error('Error en la respuesta:', result.error);
+                    throw new Error(result.error || 'Error al crear la orden de PayPal');
                 }
+                
+                // Ocultar mensaje de carga
+                document.getElementById('upgradeMessage').classList.add('hidden');
+                
+                console.log('Order ID creado:', result.order_id);
+                return result.order_id;
             } catch (error) {
+                console.error('Error en createOrder:', error);
                 showMessage('error', error.message);
+                throw error;
             }
         },
+        onApprove: async function(data, actions) {
+            console.log('onApprove llamado con data:', data);
+            try {
+                showMessage('info', 'Procesando pago...');
+                
+                // Capturar el pago
+                console.log('Capturando orden...');
+                const order = await actions.order.capture();
+                console.log('Orden capturada:', order);
+                
+                showMessage('success', '¡Pago completado! Redirigiendo...');
+                
+                // Redirigir a la página de éxito
+                const redirectUrl = '<?php echo BASE_URL; ?>/api/paypal_success_membresia.php?token=' + data.orderID + 
+                                    '&empresa_id=<?php echo $user['empresa_id']; ?>' +
+                                    '&membresia_id=' + membresiaId;
+                console.log('Redirigiendo a:', redirectUrl);
+                
+                setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 1000);
+            } catch (error) {
+                console.error('Error en onApprove:', error);
+                showMessage('error', 'Error al procesar el pago: ' + error.message);
+            }
+        },
+        onCancel: function(data) {
+            console.log('Pago cancelado:', data);
+            showMessage('info', 'Pago cancelado');
+        },
         onError: function(err) {
-            showMessage('error', 'Error al procesar el pago con PayPal');
+            console.error('PayPal Error:', err);
+            showMessage('error', 'Error al procesar el pago con PayPal. Por favor intente nuevamente.');
         }
-    }).render('#paypal-button-container');
+    }).render('#paypal-button-container').then(function() {
+        console.log('Botón de PayPal renderizado exitosamente');
+    }).catch(function(err) {
+        console.error('Error al renderizar botón de PayPal:', err);
+        showMessage('error', 'Error al cargar el botón de PayPal: ' + err.message);
+    });
 }
 
 function showMessage(type, message) {
     const messageDiv = document.getElementById('upgradeMessage');
-    messageDiv.className = type === 'success' 
-        ? 'bg-green-50 border-l-4 border-green-500 p-4 mb-4'
-        : 'bg-red-50 border-l-4 border-red-500 p-4 mb-4';
-    messageDiv.innerHTML = `<p class="text-${type === 'success' ? 'green' : 'red'}-700">${message}</p>`;
+    let bgColor = 'bg-blue-50';
+    let borderColor = 'border-blue-500';
+    let textColor = 'text-blue-700';
+    
+    if (type === 'success') {
+        bgColor = 'bg-green-50';
+        borderColor = 'border-green-500';
+        textColor = 'text-green-700';
+    } else if (type === 'error') {
+        bgColor = 'bg-red-50';
+        borderColor = 'border-red-500';
+        textColor = 'text-red-700';
+    } else if (type === 'info') {
+        bgColor = 'bg-blue-50';
+        borderColor = 'border-blue-500';
+        textColor = 'text-blue-700';
+    }
+    
+    messageDiv.className = `${bgColor} border-l-4 ${borderColor} p-4 mb-4`;
+    messageDiv.innerHTML = `<p class="${textColor}">${message}</p>`;
     messageDiv.classList.remove('hidden');
 }
 
@@ -406,6 +471,5 @@ document.getElementById('modalUpgrade').addEventListener('click', function(e) {
     }
 });
 </script>
--->
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>

@@ -445,53 +445,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             </p>
                         </div>
                         
-                        <script src="https://www.paypal.com/sdk/js?client-id=<?php 
-                            require_once __DIR__ . '/app/helpers/paypal.php';
-                            echo PayPalHelper::getClientId();
-                        ?>&currency=MXN&locale=es_MX"></script>
+                        <?php 
+                        require_once __DIR__ . '/app/helpers/paypal.php';
+                        $paypal_client_id = PayPalHelper::getClientId();
+                        if (empty($paypal_client_id)) {
+                            echo '<script>alert("PayPal no está configurado. Por favor contacte al administrador."); location.href="' . BASE_URL . '/configuracion.php";</script>';
+                        } else {
+                        ?>
+                        <script src="https://www.paypal.com/sdk/js?client-id=<?php echo $paypal_client_id; ?>&currency=MXN&locale=es_MX"></script>
+                        <?php } ?>
                         
                         <script>
+                        console.log('Inicializando botón de PayPal para eventos...');
+                        
+                        // Verificar que PayPal SDK esté cargado
+                        if (typeof paypal === 'undefined') {
+                            console.error('PayPal SDK no está cargado');
+                            document.getElementById('paypal-button-container').innerHTML = 
+                                '<div class="bg-red-50 border border-red-300 rounded p-4 text-center">' +
+                                '<i class="fas fa-exclamation-triangle text-red-600 text-2xl mb-2"></i>' +
+                                '<p class="text-red-700 font-semibold">Error: PayPal no está disponible</p>' +
+                                '<p class="text-red-600 text-sm mt-2">Por favor verifica la configuración de PayPal o contacta al administrador.</p>' +
+                                '</div>';
+                        } else {
+                            console.log('PayPal SDK cargado correctamente');
+                        
                         paypal.Buttons({
-                            createOrder: function(data, actions) {
-                                // Mostrar loading
-                                document.getElementById('paypal-button-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i><p class="text-sm text-gray-600 mt-2">Procesando...</p></div>';
+                            createOrder: async function(data, actions) {
+                                console.log('createOrder llamado');
                                 
-                                // Crear orden en el servidor
-                                return fetch('<?php echo BASE_URL; ?>/api/crear_orden_paypal_evento.php', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                        inscripcion_id: <?php echo $_SESSION['pending_payment_inscripcion_id']; ?>
-                                    })
-                                })
-                                .then(function(res) {
-                                    return res.json();
-                                })
-                                .then(function(orderData) {
-                                    if (orderData.success) {
-                                        return orderData.order_id;
-                                    } else {
+                                // Mostrar loading
+                                const container = document.getElementById('paypal-button-container');
+                                const originalHTML = container.innerHTML;
+                                container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i><p class="text-sm text-gray-600 mt-2">Creando orden de pago...</p></div>';
+                                
+                                try {
+                                    // Crear orden en el servidor
+                                    console.log('Enviando petición a crear_orden_paypal_evento.php');
+                                    const response = await fetch('<?php echo BASE_URL; ?>/api/crear_orden_paypal_evento.php', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            inscripcion_id: <?php echo $_SESSION['pending_payment_inscripcion_id']; ?>
+                                        })
+                                    });
+                                    
+                                    console.log('Respuesta recibida:', response.status);
+                                    const orderData = await response.json();
+                                    console.log('Datos de la orden:', orderData);
+                                    
+                                    if (!orderData.success) {
                                         throw new Error(orderData.error || 'Error al crear la orden');
                                     }
-                                })
-                                .catch(function(err) {
-                                    alert('Error: ' + err.message);
+                                    
+                                    // NO restaurar el botón aquí, dejarlo en loading
+                                    // PayPal lo manejará automáticamente
+                                    
+                                    console.log('Order ID:', orderData.order_id);
+                                    console.log('Approval URL:', orderData.approval_url);
+                                    console.log('Retornando order_id a PayPal SDK...');
+                                    
+                                    // TEMPORAL: Redirigir directamente a PayPal si el SDK no abre la ventana
+                                    // Esto es un workaround para el problema del pop-up
+                                    if (orderData.approval_url) {
+                                        console.log('Redirigiendo a PayPal directamente...');
+                                        // Esperar un momento y si PayPal no abre, redirigir manualmente
+                                        setTimeout(function() {
+                                            console.log('Abriendo PayPal manualmente...');
+                                            window.location.href = orderData.approval_url;
+                                        }, 1000);
+                                    }
+                                    
+                                    return orderData.order_id;
+                                    
+                                } catch (err) {
+                                    console.error('Error en createOrder:', err);
+                                    alert('Error: ' + err.message + '\n\nPor favor verifica que PayPal esté configurado correctamente.');
                                     location.reload();
-                                });
+                                    throw err;
+                                }
                             },
                             onApprove: function(data, actions) {
+                                console.log('Pago aprobado:', data);
+                                
+                                // Mostrar mensaje de procesamiento
+                                document.getElementById('paypal-button-container').innerHTML = 
+                                    '<div class="text-center py-4">' +
+                                    '<i class="fas fa-check-circle text-4xl text-green-600 mb-2"></i>' +
+                                    '<p class="text-lg font-semibold text-green-700">¡Pago completado!</p>' +
+                                    '<p class="text-sm text-gray-600 mt-2">Procesando su boleto...</p>' +
+                                    '</div>';
+                                
                                 // Redirigir a la página de éxito
-                                window.location.href = '<?php echo BASE_URL; ?>/api/paypal_success_evento.php?token=' + data.orderID + '&inscripcion_id=<?php echo $_SESSION['pending_payment_inscripcion_id']; ?>';
+                                setTimeout(function() {
+                                    window.location.href = '<?php echo BASE_URL; ?>/api/paypal_success_evento.php?token=' + data.orderID + '&inscripcion_id=<?php echo $_SESSION['pending_payment_inscripcion_id']; ?>';
+                                }, 1000);
                             },
                             onCancel: function(data) {
+                                console.log('Pago cancelado:', data);
                                 alert('Pago cancelado. Puedes intentar nuevamente en cualquier momento.');
                                 location.reload();
                             },
                             onError: function(err) {
                                 console.error('Error de PayPal:', err);
-                                alert('Ocurrió un error al procesar el pago. Por favor intenta nuevamente.');
+                                alert('Ocurrió un error al procesar el pago. Por favor intenta nuevamente.\n\nError: ' + err);
                                 location.reload();
                             },
                             style: {
@@ -501,7 +560,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 label: 'pay',
                                 height: 45
                             }
-                        }).render('#paypal-button-container');
+                        }).render('#paypal-button-container')
+                        .then(function() {
+                            console.log('Botón de PayPal renderizado exitosamente');
+                            console.log('El botón está listo. Al hacer clic, PayPal abrirá una ventana/popup.');
+                            console.log('IMPORTANTE: Si tienes bloqueador de pop-ups, debes permitirlo para este sitio.');
+                        })
+                        .catch(function(err) {
+                            console.error('Error al renderizar botón de PayPal:', err);
+                            alert('Error al cargar PayPal: ' + err.message);
+                        });
+                        
+                        } // Cierre del else de verificación de PayPal SDK
                         </script>
                         
                         <?php 

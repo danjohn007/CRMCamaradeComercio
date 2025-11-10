@@ -34,9 +34,12 @@ try {
         throw new Exception('Inscripción no encontrada');
     }
     
-    // Verificar que el evento tenga costo
-    if ($inscripcion['costo'] <= 0) {
-        throw new Exception('Este evento no requiere pago');
+    // Usar el monto que ya fue calculado en evento_publico.php (incluye preventa y boleto gratis)
+    $monto_total = floatval($inscripcion['monto_pagado'] ?? 0);
+    
+    // Verificar que haya monto a pagar
+    if ($monto_total <= 0) {
+        throw new Exception('No hay monto pendiente de pago para esta inscripción');
     }
     
     // Verificar que no se haya pagado ya
@@ -44,9 +47,8 @@ try {
         throw new Exception('Esta inscripción ya fue pagada');
     }
     
-    // Calcular monto total según número de boletos
+    // Obtener número de boletos
     $boletos = intval($inscripcion['boletos_solicitados'] ?? 1);
-    $monto_total = $inscripcion['costo'] * $boletos;
     
     // Crear descripción del pago
     $descripcion = "Evento: " . $inscripcion['titulo'] . " - " . $boletos . " boleto(s)";
