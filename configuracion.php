@@ -354,8 +354,11 @@ include __DIR__ . '/app/views/layouts/header.php';
                     <input type="url" name="paypal_webhook_url" 
                            value="<?php echo e($config['paypal_webhook_url'] ?? ''); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                           placeholder="https://yourdomain.com/webhook/paypal">
-                    <p class="text-sm text-gray-500 mt-1">URL para recibir notificaciones de PayPal sobre cambios en suscripciones</p>
+                           placeholder="<?php echo BASE_URL; ?>/webhook/paypal">
+                    <p class="text-sm text-gray-500 mt-1">
+                        URL para recibir notificaciones de PayPal sobre cambios en suscripciones<br>
+                        <strong>Nota:</strong> La Webhook URL debe ser: <code class="bg-gray-100 px-2 py-1 rounded"><?php echo BASE_URL; ?>/webhook/paypal</code>
+                    </p>
                 </div>
             </div>
 

@@ -131,12 +131,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                         $membresia_id = $result['id'];
                     }
                     
+                    // Obtener ID del vendedor si se proporcionó nombre
+                    $vendedor_id = null;
+                    if (!empty($vendedor)) {
+                        $stmt = $db->prepare("SELECT id FROM vendedores WHERE nombre = ? LIMIT 1");
+                        $stmt->execute([$vendedor]);
+                        $result = $stmt->fetch();
+                        if ($result) {
+                            $vendedor_id = $result['id'];
+                        }
+                    }
+                    
                     // Insertar empresa
                     $stmt = $db->prepare("
                         INSERT INTO empresas (
                             razon_social, rfc, email, telefono, representante,
                             direccion_comercial, direccion_fiscal, sector_id, categoria_id,
-                            membresia_id, tipo_afiliacion, vendedor, fecha_renovacion,
+                            membresia_id, tipo_afiliacion, vendedor_id, fecha_renovacion,
                             no_recibo, no_factura, engomado, activo, created_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
                     ");
@@ -145,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                         $stmt->execute([
                             $empresa, $rfc, $email, $telefono, $representante,
                             $direccion_comercial, $direccion_fiscal, $sector_id, $categoria_id,
-                            $membresia_id, $tipo_afiliacion, $vendedor, $fecha_renovacion,
+                            $membresia_id, $tipo_afiliacion, $vendedor_id, $fecha_renovacion,
                             $no_recibo, $no_factura, $engomado
                         ]);
                         
