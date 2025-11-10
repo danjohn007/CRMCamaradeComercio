@@ -51,17 +51,30 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $es_empresa_activa = ($empresa_data && $empresa_data['activo'] == 1);
                 }
                 
+                // Determinar el precio efectivo del evento (preventa o regular)
+                $precio_efectivo = $evento['costo'];
+                $ahora = new DateTime();
+                
+                // Si hay precio de preventa y aún no pasó la fecha límite, usar precio de preventa
+                if (isset($evento['precio_preventa']) && $evento['precio_preventa'] > 0 && 
+                    !empty($evento['fecha_limite_preventa'])) {
+                    $fecha_limite = new DateTime($evento['fecha_limite_preventa']);
+                    if ($ahora <= $fecha_limite) {
+                        $precio_efectivo = $evento['precio_preventa'];
+                    }
+                }
+                
                 // Determinar si requiere pago
                 $requiere_pago = false;
                 $es_boleto_gratis = false;
                 $monto_total = 0;
                 
-                if ($evento['costo'] > 0) {
+                if ($precio_efectivo > 0) {
                     // Si la empresa está activa (afiliada), el boleto es gratis
                     $es_boleto_gratis = $es_empresa_activa;
                     // Si no es empresa activa, requiere pago
                     $requiere_pago = !$es_boleto_gratis;
-                    $monto_total = $requiere_pago ? $evento['costo'] : 0;
+                    $monto_total = $requiere_pago ? $precio_efectivo : 0;
                 }
                 
                 // Determinar estado inicial de pago
@@ -103,11 +116,11 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $codigo_qr
                 );
                 
-                // Si no requiere pago, enviar boleto inmediatamente
-                if (!$requiere_pago) {
-                    try {
-                        // Enviar email de confirmación con boleto digital
-                        EmailHelper::sendEventTicket($inscripcion, $evento, $qrCodePath);
+                // Enviar email de confirmación según el estado del pago
+                try {
+                    if (!$requiere_pago) {
+                        // Evento gratuito o empresa afiliada con 1 boleto - enviar confirmación con boleto
+                        EmailHelper::sendEventRegistrationConfirmation($inscripcion, $evento, false, 0, $qrCodePath);
                         
                         // Actualizar que el boleto fue enviado
                         $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
@@ -119,16 +132,27 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                             $success = "¡Inscripción exitosa! Este evento es gratuito. Se ha enviado un correo de confirmación con tu boleto digital. ";
                         }
                         $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
-                    } catch (Exception $e) {
-                        // Si falla el envío de email, aún así la inscripción fue exitosa
-                        $success = "¡Inscripción exitosa! ";
-                        $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Boleto Digital</a>";
-                        error_log("Error al enviar email de confirmación: " . $e->getMessage());
+                    } else {
+                        // Requiere pago - enviar confirmación con link de pago
+                        EmailHelper::sendEventRegistrationConfirmation($inscripcion, $evento, true, $monto_total);
+                        
+                        $success = "¡Registro exitoso! Se ha enviado un correo de confirmación a tu email. Para completar tu inscripción y obtener ";
+                        if ($es_boleto_gratis) {
+                            $success .= "tus boletos adicionales";
+                        } else {
+                            $success .= "tus boletos";
+                        }
+                        $success .= ", por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong>. ";
+                        $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ir a Pagar</a>";
                     }
-                } else {
-                    // Requiere pago
-                    $success = "¡Registro exitoso! Para completar tu inscripción y obtener tu boleto, por favor realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong>. ";
-                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ir a Pagar</a>";
+                } catch (Exception $e) {
+                    // Si falla el envío de email, aún así la inscripción fue exitosa
+                    $success = "¡Inscripción exitosa! ";
+                    if ($requiere_pago) {
+                        $success .= "Para completar tu inscripción, realiza el pago de <strong>\$" . number_format($monto_total, 2) . " MXN</strong>. ";
+                    }
+                    $success .= "<a href='" . BASE_URL . "/boleto_digital.php?codigo=" . urlencode($codigo_qr) . "' target='_blank' class='underline font-bold'>Ver Detalles</a>";
+                    error_log("Error al enviar email de confirmación: " . $e->getMessage());
                 }
                 
                 // Cambiar acción a 'view' para mostrar la página del evento con el mensaje
@@ -141,13 +165,18 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Verificar si la columna costo existe en la tabla eventos
+// Verificar si las columnas de costo y preventa existen en la tabla eventos
 $costo_column_exists = false;
+$preventa_columns_exist = false;
 try {
     $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'costo'");
     $costo_column_exists = $stmt->fetch() !== false;
+    
+    $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'precio_preventa'");
+    $preventa_columns_exist = $stmt->fetch() !== false;
 } catch (Exception $e) {
     $costo_column_exists = false;
+    $preventa_columns_exist = false;
 }
 
 // Procesar formulario de nuevo evento o edición
@@ -161,6 +190,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
         'tipo' => $_POST['tipo'] ?? 'PUBLICO',
         'cupo_maximo' => $_POST['cupo_maximo'] ? (int)$_POST['cupo_maximo'] : null,
         'costo' => ($costo_column_exists && isset($_POST['costo'])) ? (float)$_POST['costo'] : 0,
+        'precio_preventa' => ($preventa_columns_exist && isset($_POST['precio_preventa']) && $_POST['precio_preventa'] !== '') ? (float)$_POST['precio_preventa'] : null,
+        'fecha_limite_preventa' => ($preventa_columns_exist && !empty($_POST['fecha_limite_preventa'])) ? $_POST['fecha_limite_preventa'] : null,
         'requiere_inscripcion' => isset($_POST['requiere_inscripcion']) ? 1 : 0,
         'imagen' => null
     ];
@@ -178,8 +209,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
     if (!$error) {
         try {
             if ($action === 'new') {
-                // Construir SQL dinámicamente basado en si existe la columna costo
-                if ($costo_column_exists) {
+                // Construir SQL dinámicamente basado en si existen las columnas costo y preventa
+                if ($costo_column_exists && $preventa_columns_exist) {
+                    $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, precio_preventa, fecha_limite_preventa, imagen, requiere_inscripcion, creado_por) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params = [
+                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], 
+                        $data['precio_preventa'], $data['fecha_limite_preventa'], $data['imagen'],
+                        $data['requiere_inscripcion'], $user['id']
+                    ];
+                } elseif ($costo_column_exists) {
                     $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, imagen, requiere_inscripcion, creado_por) 
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     $params = [
@@ -206,7 +246,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
                 // UPDATE para edición
                 if ($data['imagen']) {
                     // Con nueva imagen
-                    if ($costo_column_exists) {
+                    if ($costo_column_exists && $preventa_columns_exist) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, precio_preventa = ?, fecha_limite_preventa = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], 
+                            $data['precio_preventa'], $data['fecha_limite_preventa'], $data['imagen'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    } elseif ($costo_column_exists) {
                         $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
                                 ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
                         $params = [
@@ -225,7 +274,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
                     }
                 } else {
                     // Sin nueva imagen
-                    if ($costo_column_exists) {
+                    if ($costo_column_exists && $preventa_columns_exist) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, precio_preventa = ?, fecha_limite_preventa = ?, requiere_inscripcion = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'],
+                            $data['precio_preventa'], $data['fecha_limite_preventa'],
+                            $data['requiere_inscripcion'], $id
+                        ];
+                    } elseif ($costo_column_exists) {
                         $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
                                 ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, requiere_inscripcion = ? WHERE id = ?";
                         $params = [
@@ -510,10 +568,52 @@ include __DIR__ . '/app/views/layouts/header.php';
                 <?php if (isset($evento['costo']) && $evento['costo'] > 0): ?>
                 <div class="mb-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-3">Costo</h2>
-                    <div class="flex items-center text-gray-600">
-                        <i class="fas fa-dollar-sign mr-3 text-green-500"></i>
-                        <span class="font-semibold text-2xl">$<?php echo number_format($evento['costo'], 2); ?> MXN</span>
-                    </div>
+                    <?php
+                    // Determinar el precio efectivo (preventa o regular)
+                    $precio_efectivo = $evento['costo'];
+                    $mostrar_preventa = false;
+                    $ahora_view = new DateTime();
+                    
+                    if (isset($evento['precio_preventa']) && $evento['precio_preventa'] > 0 && 
+                        !empty($evento['fecha_limite_preventa'])) {
+                        $fecha_limite_view = new DateTime($evento['fecha_limite_preventa']);
+                        if ($ahora_view <= $fecha_limite_view) {
+                            $precio_efectivo = $evento['precio_preventa'];
+                            $mostrar_preventa = true;
+                        }
+                    }
+                    ?>
+                    
+                    <?php if ($mostrar_preventa): ?>
+                        <div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="flex items-center text-yellow-800 font-bold text-xl mb-1">
+                                        <i class="fas fa-tag mr-2"></i>
+                                        <span>¡PRECIO DE PREVENTA!</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <span class="text-3xl font-bold text-green-600">$<?php echo number_format($evento['precio_preventa'], 2); ?> MXN</span>
+                                        <span class="ml-3 text-gray-500 line-through">$<?php echo number_format($evento['costo'], 2); ?> MXN</span>
+                                    </div>
+                                    <div class="text-sm text-yellow-700 mt-2">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        Válido hasta: <?php echo formatDate($evento['fecha_limite_preventa'], 'd/m/Y H:i'); ?>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="bg-red-500 text-white px-4 py-2 rounded-lg font-bold">
+                                        AHORRA<br>$<?php echo number_format($evento['costo'] - $evento['precio_preventa'], 2); ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="flex items-center text-gray-600">
+                            <i class="fas fa-dollar-sign mr-3 text-green-500"></i>
+                            <span class="font-semibold text-2xl">$<?php echo number_format($evento['costo'], 2); ?> MXN</span>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
 
@@ -671,20 +771,49 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </select>
                 </div>
 
-                <!-- Cupo y Costo -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-700 font-semibold mb-2">Cupo Máximo (dejar vacío para ilimitado)</label>
-                        <input type="number" name="cupo_maximo" min="1"
-                               value="<?php echo e($evento['cupo_maximo'] ?? ''); ?>"
-                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <!-- Cupo Máximo -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Cupo Máximo (dejar vacío para ilimitado)</label>
+                    <input type="number" name="cupo_maximo" min="1"
+                           value="<?php echo e($evento['cupo_maximo'] ?? ''); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Costo y Preventa -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-dollar-sign mr-2 text-blue-600"></i>
+                        Configuración de Precios
+                    </h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-700 font-semibold mb-2">Costo del Evento (MXN)</label>
+                            <input type="number" name="costo" min="0" step="0.01"
+                                   value="<?php echo e($evento['costo'] ?? '0'); ?>"
+                                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                   placeholder="0.00">
+                            <p class="text-sm text-gray-500 mt-1">Precio regular del boleto</p>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-semibold mb-2">Precio de Preventa (MXN)</label>
+                            <input type="number" name="precio_preventa" min="0" step="0.01"
+                                   value="<?php echo e($evento['precio_preventa'] ?? ''); ?>"
+                                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                   placeholder="0.00">
+                            <p class="text-sm text-gray-500 mt-1">Precio especial hasta la fecha límite</p>
+                        </div>
                     </div>
+                    
                     <div>
-                        <label class="block text-gray-700 font-semibold mb-2">Costo del Evento (MXN)</label>
-                        <input type="number" name="costo" min="0" step="0.01"
-                               value="<?php echo e($evento['costo'] ?? '0'); ?>"
-                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                               placeholder="0.00">
+                        <label class="block text-gray-700 font-semibold mb-2">Fecha Límite de Preventa</label>
+                        <input type="datetime-local" name="fecha_limite_preventa"
+                               value="<?php echo isset($evento['fecha_limite_preventa']) ? date('Y-m-d\TH:i', strtotime($evento['fecha_limite_preventa'])) : ''; ?>"
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Después de esta fecha, se cobrará el precio regular
+                        </p>
                     </div>
                 </div>
 
