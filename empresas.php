@@ -178,7 +178,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'UPDATE_EMPRESA', 'empresas', ?)");
             $stmt->execute([$user['id'], $id]);
             
-            $success = 'Empresa actualizada exitosamente';
+            // Procesar imágenes nuevas si están presentes
+            if (!empty($_FILES['nuevas_imagenes']['name'][0])) {
+                // Contar imágenes actuales
+                $stmt = $db->prepare("SELECT COUNT(*) as total FROM empresa_imagenes WHERE empresa_id = ?");
+                $stmt->execute([$id]);
+                $count_result = $stmt->fetch();
+                $current_count = intval($count_result['total']);
+                
+                $uploaded_count = 0;
+                foreach ($_FILES['nuevas_imagenes']['name'] as $key => $name) {
+                    if ($current_count + $uploaded_count >= 5) {
+                        break; // Máximo 5 imágenes
+                    }
+                    
+                    if ($_FILES['nuevas_imagenes']['error'][$key] === UPLOAD_ERR_OK) {
+                        $tmp_name = $_FILES['nuevas_imagenes']['tmp_name'][$key];
+                        $size = $_FILES['nuevas_imagenes']['size'][$key];
+                        
+                        // Validar tamaño (5MB max)
+                        if ($size > 5242880) {
+                            continue;
+                        }
+                        
+                        // Validar tipo de archivo
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (!in_array($ext, ['jpg', 'jpeg', 'png'])) {
+                            continue;
+                        }
+                        
+                        // Generar nombre único
+                        $filename = 'empresa_' . $id . '_' . uniqid() . '.' . $ext;
+                        $destination = UPLOAD_PATH . '/' . $filename;
+                        
+                        if (move_uploaded_file($tmp_name, $destination)) {
+                            // Guardar en base de datos
+                            $orden = $current_count + $uploaded_count;
+                            $stmt = $db->prepare("INSERT INTO empresa_imagenes (empresa_id, ruta_imagen, orden) VALUES (?, ?, ?)");
+                            $stmt->execute([$id, $filename, $orden]);
+                            $uploaded_count++;
+                        }
+                    }
+                }
+                
+                if ($uploaded_count > 0) {
+                    $success = "Empresa actualizada exitosamente. Se agregaron {$uploaded_count} imagen(es).";
+                }
+            }
+            
+            // Actualizar descripciones de imágenes existentes
+            foreach ($_POST as $key => $value) {
+                if (strpos($key, 'imagen_descripcion_') === 0) {
+                    $imagen_id = intval(str_replace('imagen_descripcion_', '', $key));
+                    $descripcion = sanitize($value);
+                    $stmt = $db->prepare("UPDATE empresa_imagenes SET descripcion = ? WHERE id = ? AND empresa_id = ?");
+                    $stmt->execute([$descripcion, $imagen_id, $id]);
+                }
+            }
+            
+            if (empty($success)) {
+                $success = 'Empresa actualizada exitosamente';
+            }
             $action = 'list';
         }
     } catch (Exception $e) {
@@ -428,7 +488,7 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
         <?php endif; ?>
 
-        <form method="POST" class="bg-white rounded-lg shadow-md p-8" id="formEmpresa">
+        <form method="POST" enctype="multipart/form-data" class="bg-white rounded-lg shadow-md p-8" id="formEmpresa">
             <?php if ($action === 'new'): ?>
             <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
                 <p class="text-sm text-blue-700">
@@ -694,6 +754,71 @@ include __DIR__ . '/app/views/layouts/header.php';
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                            placeholder="https://www.ejemplo.com">
                 </div>
+
+                <?php if ($action === 'edit' && isset($empresa['id'])): ?>
+                <!-- Galería de Imágenes (solo en edición) -->
+                <div class="md:col-span-2 mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-images mr-2"></i>Galería de Imágenes (1-5 imágenes)
+                    </h3>
+                    
+                    <?php
+                    // Obtener imágenes actuales
+                    $stmt = $db->prepare("SELECT * FROM empresa_imagenes WHERE empresa_id = ? ORDER BY orden ASC");
+                    $stmt->execute([$empresa['id']]);
+                    $imagenes_actuales = $stmt->fetchAll();
+                    ?>
+                    
+                    <!-- Imágenes actuales -->
+                    <?php if (!empty($imagenes_actuales)): ?>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 mb-2">Imágenes actuales (<?php echo count($imagenes_actuales); ?>/5):</p>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="imagenesActuales">
+                            <?php foreach ($imagenes_actuales as $img): ?>
+                            <div class="relative border rounded-lg p-2" data-imagen-id="<?php echo $img['id']; ?>">
+                                <img src="<?php echo BASE_URL . '/public/uploads/' . htmlspecialchars($img['ruta_imagen']); ?>" 
+                                     class="w-full h-32 object-cover rounded">
+                                <button type="button" 
+                                        class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700"
+                                        onclick="eliminarImagen(<?php echo $img['id']; ?>, <?php echo $empresa['id']; ?>)"
+                                        title="Eliminar imagen">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                                <input type="text" 
+                                       name="imagen_descripcion_<?php echo $img['id']; ?>" 
+                                       value="<?php echo htmlspecialchars($img['descripcion'] ?? ''); ?>"
+                                       placeholder="Descripción opcional"
+                                       class="w-full text-xs px-2 py-1 border rounded mt-1">
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Subir nuevas imágenes -->
+                    <?php if (count($imagenes_actuales) < 5): ?>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">
+                            Agregar nuevas imágenes (máximo <?php echo 5 - count($imagenes_actuales); ?> más)
+                        </label>
+                        <input type="file" 
+                               name="nuevas_imagenes[]" 
+                               id="nuevas_imagenes"
+                               accept="image/jpeg,image/jpg,image/png"
+                               multiple
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">
+                            Formatos permitidos: JPG, PNG. Tamaño máximo: 5MB por imagen.
+                        </p>
+                    </div>
+                    <?php else: ?>
+                    <p class="text-sm text-orange-600">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Has alcanzado el límite de 5 imágenes. Elimina alguna para agregar más.
+                    </p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Botones -->
@@ -706,6 +831,49 @@ include __DIR__ . '/app/views/layouts/header.php';
                 </button>
             </div>
         </form>
+        
+        <script>
+        // Validar cantidad de imágenes
+        document.getElementById('nuevas_imagenes')?.addEventListener('change', function(e) {
+            const currentCount = document.querySelectorAll('#imagenesActuales > div').length || 0;
+            const newCount = e.target.files.length;
+            const total = currentCount + newCount;
+            
+            if (total > 5) {
+                alert(`Solo puedes tener máximo 5 imágenes. Actualmente tienes ${currentCount} y estás intentando agregar ${newCount}.`);
+                e.target.value = '';
+            }
+        });
+        
+        function eliminarImagen(imagenId, empresaId) {
+            if (!confirm('¿Estás seguro de eliminar esta imagen?')) {
+                return;
+            }
+            
+            fetch('<?php echo BASE_URL; ?>/api/eliminar_imagen_empresa.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    imagen_id: imagenId,
+                    empresa_id: empresaId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message || 'Error al eliminar la imagen');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al eliminar la imagen');
+            });
+        }
+        </script>
     </div>
 </div>
 
