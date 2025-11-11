@@ -323,3 +323,73 @@ function registrarAuditoria($conn, $usuario_id, $accion, $tabla = '', $registro_
         return false;
     }
 }
+
+/**
+ * Verificar si una empresa tiene membresía vigente
+ * 
+ * @param int $empresa_id ID de la empresa
+ * @return bool True si la membresía está vigente, false en caso contrario
+ */
+function empresaTieneMembresiaVigente($empresa_id) {
+    try {
+        $db = Database::getInstance()->getConnection();
+        
+        $stmt = $db->prepare("
+            SELECT e.fecha_renovacion, m.vigencia_meses
+            FROM empresas e
+            LEFT JOIN membresias m ON e.membresia_id = m.id
+            WHERE e.id = ? AND e.activo = 1
+        ");
+        $stmt->execute([$empresa_id]);
+        $empresa = $stmt->fetch();
+        
+        if (!$empresa || !$empresa['fecha_renovacion'] || !$empresa['vigencia_meses']) {
+            return false;
+        }
+        
+        $fecha_renovacion = new DateTime($empresa['fecha_renovacion']);
+        $vigencia_meses = intval($empresa['vigencia_meses']);
+        $fecha_vencimiento = clone $fecha_renovacion;
+        $fecha_vencimiento->modify("+{$vigencia_meses} months");
+        $ahora = new DateTime();
+        
+        return ($ahora <= $fecha_vencimiento);
+    } catch (Exception $e) {
+        error_log("Error al verificar membresía vigente: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Actualizar estado de empresa según vencimiento de membresía
+ * 
+ * @param int $empresa_id ID de la empresa (opcional, si no se proporciona actualiza todas)
+ * @return int Número de empresas actualizadas
+ */
+function actualizarEstadoEmpresasPorVencimiento($empresa_id = null) {
+    try {
+        $db = Database::getInstance()->getConnection();
+        
+        $where_clause = $empresa_id ? "AND e.id = ?" : "";
+        $params = $empresa_id ? [$empresa_id] : [];
+        
+        $sql = "
+            UPDATE empresas e
+            LEFT JOIN membresias m ON e.membresia_id = m.id
+            SET e.activo = 0
+            WHERE e.activo = 1
+            AND e.fecha_renovacion IS NOT NULL
+            AND m.vigencia_meses IS NOT NULL
+            AND DATE_ADD(e.fecha_renovacion, INTERVAL m.vigencia_meses MONTH) < CURDATE()
+            {$where_clause}
+        ";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        
+        return $stmt->rowCount();
+    } catch (Exception $e) {
+        error_log("Error al actualizar estado de empresas: " . $e->getMessage());
+        return 0;
+    }
+}
