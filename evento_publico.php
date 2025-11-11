@@ -201,14 +201,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $boletos_a_pagar = $boletos; // Por defecto, todos los boletos requieren pago
         
         if ($precio_efectivo > 0) {
-            // Si la empresa está activa (afiliada), solo 1 boleto es gratis
+            // Verificar si la empresa tiene membresía vigente (no suspendida)
             if ($empresa_id) {
-                $stmt = $db->prepare("SELECT activo FROM empresas WHERE id = ? AND activo = 1");
+                $stmt = $db->prepare("
+                    SELECT e.id, e.fecha_renovacion, m.vigencia_meses
+                    FROM empresas e
+                    LEFT JOIN membresias m ON e.membresia_id = m.id
+                    WHERE e.id = ? AND e.activo = 1
+                ");
                 $stmt->execute([$empresa_id]);
-                $empresa_activa = $stmt->fetch();
-                if ($empresa_activa !== false) {
-                    $boletos_gratis = 1; // Solo 1 boleto gratis para empresas activas
-                    $es_boleto_gratis = true;
+                $empresa_data = $stmt->fetch();
+                
+                if ($empresa_data) {
+                    // Verificar vigencia de membresía
+                    $tiene_membresia_vigente = false;
+                    
+                    if ($empresa_data['fecha_renovacion'] && $empresa_data['vigencia_meses']) {
+                        $fecha_renovacion = new DateTime($empresa_data['fecha_renovacion']);
+                        $vigencia_meses = intval($empresa_data['vigencia_meses']);
+                        $fecha_vencimiento = clone $fecha_renovacion;
+                        $fecha_vencimiento->modify("+{$vigencia_meses} months");
+                        $ahora = new DateTime();
+                        
+                        // La membresía está vigente si no ha vencido
+                        $tiene_membresia_vigente = ($ahora <= $fecha_vencimiento);
+                    }
+                    
+                    // Solo dar boleto gratis si la membresía está vigente
+                    if ($tiene_membresia_vigente) {
+                        $boletos_gratis = 1; // Solo 1 boleto gratis para empresas con membresía vigente
+                        $es_boleto_gratis = true;
+                    }
                 }
             }
             
@@ -474,11 +497,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             createOrder: async function(data, actions) {
                                 console.log('createOrder llamado');
                                 
-                                // Mostrar loading
-                                const container = document.getElementById('paypal-button-container');
-                                const originalHTML = container.innerHTML;
-                                container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i><p class="text-sm text-gray-600 mt-2">Creando orden de pago...</p></div>';
-                                
                                 try {
                                     // Crear orden en el servidor
                                     console.log('Enviando petición a crear_orden_paypal_evento.php');
@@ -500,30 +518,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                         throw new Error(orderData.error || 'Error al crear la orden');
                                     }
                                     
-                                    // NO restaurar el botón aquí, dejarlo en loading
-                                    // PayPal lo manejará automáticamente
-                                    
                                     console.log('Order ID:', orderData.order_id);
-                                    console.log('Approval URL:', orderData.approval_url);
                                     console.log('Retornando order_id a PayPal SDK...');
                                     
-                                    // TEMPORAL: Redirigir directamente a PayPal si el SDK no abre la ventana
-                                    // Esto es un workaround para el problema del pop-up
-                                    if (orderData.approval_url) {
-                                        console.log('Redirigiendo a PayPal directamente...');
-                                        // Esperar un momento y si PayPal no abre, redirigir manualmente
-                                        setTimeout(function() {
-                                            console.log('Abriendo PayPal manualmente...');
-                                            window.location.href = orderData.approval_url;
-                                        }, 1000);
-                                    }
-                                    
+                                    // Retornar el order_id para que PayPal SDK lo maneje
                                     return orderData.order_id;
                                     
                                 } catch (err) {
                                     console.error('Error en createOrder:', err);
                                     alert('Error: ' + err.message + '\n\nPor favor verifica que PayPal esté configurado correctamente.');
-                                    location.reload();
                                     throw err;
                                 }
                             },

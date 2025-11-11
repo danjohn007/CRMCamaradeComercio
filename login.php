@@ -231,11 +231,17 @@ if (isset($_GET['success'])) {
                     </button>
                 </form>
 
-                <div class="mt-6 text-center">
+                <div class="mt-6 text-center space-y-3">
                     <p class="text-gray-600">
                         ¿No tienes cuenta? 
                         <a href="register.php" class="text-blue-600 hover:underline font-semibold">
                             Regístrate aquí
+                        </a>
+                    </p>
+                    <p class="text-gray-600">
+                        <a href="directorio_publico.php" class="text-blue-600 hover:underline font-semibold">
+                            <i class="fas fa-building mr-1"></i>
+                            Ver Directorio de Empresas
                         </a>
                     </p>
                 </div>

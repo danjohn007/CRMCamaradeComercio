@@ -72,6 +72,12 @@ class EmailHelper {
         $codigo_qr = $inscripcion['codigo_qr'];
         $es_empresa_afiliada = !empty($inscripcion['empresa_id']);
         
+        // Obtener colores del sistema
+        $color_primario = $config['color_primario'] ?? '#1E40AF';
+        $color_secundario = $config['color_secundario'] ?? '#10B981';
+        $color_acento = $config['color_acento1'] ?? '#F59E0B';
+        $logo_url = !empty($config['logo_sistema']) ? BASE_URL . $config['logo_sistema'] : '';
+        
         $subject = "Confirmación de Boleto - " . $evento['titulo'];
         
         // Construir HTML del email
@@ -83,21 +89,23 @@ class EmailHelper {
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #1E40AF; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .header { background: {$color_primario}; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo { max-width: 150px; height: auto; margin-bottom: 10px; }
         .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
-        .ticket { background: white; padding: 20px; margin: 20px 0; border: 2px dashed #1E40AF; border-radius: 5px; }
+        .ticket { background: white; padding: 20px; margin: 20px 0; border: 2px dashed {$color_primario}; border-radius: 5px; }
         .qr-code { text-align: center; margin: 20px 0; }
-        .qr-code img { max-width: 250px; border: 2px solid #1E40AF; padding: 10px; background: white; }
+        .qr-code img { max-width: 250px; border: 2px solid {$color_primario}; padding: 10px; background: white; }
         .info-row { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 3px; }
-        .info-label { font-weight: bold; color: #1E40AF; }
-        .button { display: inline-block; padding: 12px 30px; background: #10B981; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+        .info-label { font-weight: bold; color: {$color_primario}; }
+        .button { display: inline-block; padding: 12px 30px; background: {$color_secundario}; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
         .footer { background: #333; color: white; padding: 20px; text-align: center; border-radius: 0 0 5px 5px; font-size: 12px; }
-        .invitation-box { background: #fef3c7; border: 2px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .invitation-box { background: #fef3c7; border: 2px solid {$color_acento}; padding: 20px; margin: 20px 0; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class='container'>
-        <div class='header'>
+        <div class='header'>" . 
+            ($logo_url ? "<img src='{$logo_url}' alt='Logo' class='logo'>" : "") . "
             <h1>¡Boleto Confirmado!</h1>
             <p>" . htmlspecialchars($nombre_sitio) . "</p>
         </div>
@@ -216,6 +224,12 @@ class EmailHelper {
         $codigo_qr = $inscripcion['codigo_qr'];
         $es_empresa_afiliada = !empty($inscripcion['empresa_id']);
         
+        // Obtener colores del sistema
+        $color_primario = $config['color_primario'] ?? '#1E40AF';
+        $color_secundario = $config['color_secundario'] ?? '#10B981';
+        $color_acento = $config['color_acento1'] ?? '#F59E0B';
+        $logo_url = !empty($config['logo_sistema']) ? BASE_URL . $config['logo_sistema'] : '';
+        
         $subject = "Registro Confirmado - " . $evento['titulo'];
         
         // Construir HTML del email
@@ -227,21 +241,23 @@ class EmailHelper {
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #1E40AF; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .header { background: {$color_primario}; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo { max-width: 150px; height: auto; margin-bottom: 10px; }
         .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
-        .info-box { background: white; padding: 20px; margin: 20px 0; border: 2px solid #1E40AF; border-radius: 5px; }
+        .info-box { background: white; padding: 20px; margin: 20px 0; border: 2px solid {$color_primario}; border-radius: 5px; }
         .info-row { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 3px; }
-        .info-label { font-weight: bold; color: #1E40AF; }
-        .button { display: inline-block; padding: 12px 30px; background: #10B981; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+        .info-label { font-weight: bold; color: {$color_primario}; }
+        .button { display: inline-block; padding: 12px 30px; background: {$color_secundario}; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
         .button-payment { background: #2563EB; }
         .footer { background: #333; color: white; padding: 20px; text-align: center; border-radius: 0 0 5px 5px; font-size: 12px; }
-        .warning-box { background: #fef3c7; border: 2px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 5px; }
-        .success-box { background: #d1fae5; border: 2px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .warning-box { background: #fef3c7; border: 2px solid {$color_acento}; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .success-box { background: #d1fae5; border: 2px solid {$color_secundario}; padding: 20px; margin: 20px 0; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class='container'>
-        <div class='header'>
+        <div class='header'>" . 
+            ($logo_url ? "<img src='{$logo_url}' alt='Logo' class='logo'>" : "") . "
             <h1>¡Registro Exitoso!</h1>
             <p>" . htmlspecialchars($nombre_sitio) . "</p>
         </div>
@@ -407,6 +423,11 @@ class EmailHelper {
         $codigo_qr = $inscripcion['codigo_qr'];
         $es_empresa_afiliada = !empty($inscripcion['empresa_id']);
         
+        // Obtener colores del sistema
+        $color_primario = $config['color_primario'] ?? '#1E40AF';
+        $color_secundario = $config['color_secundario'] ?? '#10B981';
+        $logo_url = !empty($config['logo_sistema']) ? BASE_URL . $config['logo_sistema'] : '';
+        
         // Si no se especifica, enviar todos los boletos
         if ($boletos_enviados === null) {
             $boletos_enviados = $boletos_total;
@@ -423,21 +444,23 @@ class EmailHelper {
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #10B981; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .header { background: {$color_secundario}; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo { max-width: 150px; height: auto; margin-bottom: 10px; }
         .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
-        .ticket { background: white; padding: 20px; margin: 20px 0; border: 2px dashed #1E40AF; border-radius: 5px; }
+        .ticket { background: white; padding: 20px; margin: 20px 0; border: 2px dashed {$color_primario}; border-radius: 5px; }
         .qr-code { text-align: center; margin: 20px 0; }
-        .qr-code img { max-width: 250px; border: 2px solid #1E40AF; padding: 10px; background: white; }
+        .qr-code img { max-width: 250px; border: 2px solid {$color_primario}; padding: 10px; background: white; }
         .info-row { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 3px; }
-        .info-label { font-weight: bold; color: #1E40AF; }
-        .button { display: inline-block; padding: 12px 30px; background: #10B981; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+        .info-label { font-weight: bold; color: {$color_primario}; }
+        .button { display: inline-block; padding: 12px 30px; background: {$color_secundario}; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
         .footer { background: #333; color: white; padding: 20px; text-align: center; border-radius: 0 0 5px 5px; font-size: 12px; }
-        .success-banner { background: #d1fae5; border: 2px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 5px; text-align: center; }
+        .success-banner { background: #d1fae5; border: 2px solid {$color_secundario}; padding: 15px; margin: 20px 0; border-radius: 5px; text-align: center; }
     </style>
 </head>
 <body>
     <div class='container'>
-        <div class='header'>
+        <div class='header'>" . 
+            ($logo_url ? "<img src='{$logo_url}' alt='Logo' class='logo'>" : "") . "
             <h1>✅ ¡Pago Confirmado!</h1>
             <p>" . htmlspecialchars($nombre_sitio) . "</p>
         </div>
