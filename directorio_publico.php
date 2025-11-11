@@ -11,6 +11,10 @@ $db = Database::getInstance()->getConnection();
 // Obtener configuración
 $config = getConfiguracion();
 
+// Check if user is logged in
+$user = getCurrentUser();
+$is_logged_in = isLoggedIn();
+
 // Parámetros de búsqueda
 $query = $_GET['q'] ?? '';
 $sector = $_GET['sector'] ?? '';
@@ -55,9 +59,10 @@ $stmt->execute($params);
 $total_results = $stmt->fetch()['total'];
 $total_pages = ceil($total_results / $per_page);
 
-// Obtener resultados paginados
+// Obtener resultados paginados con calificación promedio
 $offset = ($page - 1) * $per_page;
-$sql = "SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre
+$sql = "SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre,
+        e.calificacion_promedio, e.total_calificaciones
         FROM empresas e
         LEFT JOIN sectores s ON e.sector_id = s.id
         LEFT JOIN categorias c ON e.categoria_id = c.id
@@ -68,6 +73,24 @@ $sql = "SELECT e.*, s.nombre as sector_nombre, c.nombre as categoria_nombre
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $empresas = $stmt->fetchAll();
+
+// Si el usuario está logueado, obtener sus favoritos
+$favoritos = [];
+if ($is_logged_in && $user) {
+    $stmt = $db->prepare("SELECT empresa_id FROM empresa_favoritos WHERE usuario_id = ?");
+    $stmt->execute([$user['id']]);
+    $favoritos = array_column($stmt->fetchAll(), 'empresa_id');
+}
+
+// Obtener imágenes para cada empresa
+$empresas_con_imagenes = [];
+foreach ($empresas as $empresa) {
+    $stmt = $db->prepare("SELECT * FROM empresa_imagenes WHERE empresa_id = ? ORDER BY orden ASC");
+    $stmt->execute([$empresa['id']]);
+    $empresa['imagenes'] = $stmt->fetchAll();
+    $empresas_con_imagenes[] = $empresa;
+}
+$empresas = $empresas_con_imagenes;
 
 // Obtener filtros disponibles
 $sectores = $db->query("SELECT * FROM sectores WHERE activo = 1 ORDER BY nombre")->fetchAll();
@@ -83,6 +106,8 @@ $ciudades = $db->query("SELECT DISTINCT ciudad FROM empresas WHERE activo = 1 AN
     <meta name="description" content="Directorio público de empresas afiliadas a la Cámara de Comercio. Busca productos y servicios de empresas locales.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Swiper JS for slider -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
         .header-bg {
             background: <?php echo $config['color_primario'] ?? '#1E40AF'; ?>;
@@ -95,6 +120,61 @@ $ciudades = $db->query("SELECT DISTINCT ciudad FROM empresas WHERE activo = 1 AN
         }
         .text-primary {
             color: <?php echo $config['color_primario'] ?? '#1E40AF'; ?>;
+        }
+        .swiper {
+            width: 100%;
+            height: 100%;
+        }
+        .swiper-slide {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .swiper-slide img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: zoom-in;
+        }
+        /* Modal para zoom de imagen */
+        .image-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+        .image-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        .image-modal .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .action-icon {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .action-icon:hover {
+            transform: scale(1.2);
+        }
+        .action-icon.active {
+            color: #EF4444;
         }
     </style>
 </head>
@@ -112,9 +192,21 @@ $ciudades = $db->query("SELECT DISTINCT ciudad FROM empresas WHERE activo = 1 AN
                         <p class="text-sm opacity-90">Directorio de Empresas Afiliadas</p>
                     </div>
                 </div>
+                <?php if ($is_logged_in): ?>
+                <div class="flex items-center gap-4">
+                    <span class="text-white text-sm">
+                        <i class="fas fa-user mr-2"></i><?php echo htmlspecialchars($user['nombre']); ?>
+                    </span>
+                    <a href="<?php echo BASE_URL; ?>/dashboard.php" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition font-semibold text-sm">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </div>
+                <?php else: ?>
                 <a href="<?php echo BASE_URL; ?>/login.php" class="bg-white text-blue-600 px-6 py-2 rounded-lg hover:bg-gray-100 transition font-semibold">
                     <i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión
                 </a>
+                <?php endif; ?>
+
             </div>
         </div>
     </header>
@@ -207,12 +299,34 @@ $ciudades = $db->query("SELECT DISTINCT ciudad FROM empresas WHERE activo = 1 AN
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <?php foreach ($empresas as $empresa): ?>
                 <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition overflow-hidden">
-                    <!-- Logo de la empresa -->
-                    <?php if (!empty($empresa['logo'])): ?>
+                    <!-- Imágenes de la empresa con slider -->
+                    <?php if (!empty($empresa['imagenes']) && count($empresa['imagenes']) > 0): ?>
+                    <div class="h-48 bg-gray-100 relative">
+                        <div class="swiper empresa-swiper-<?php echo $empresa['id']; ?> h-full">
+                            <div class="swiper-wrapper">
+                                <?php foreach ($empresa['imagenes'] as $imagen): ?>
+                                <div class="swiper-slide">
+                                    <img src="<?php echo BASE_URL . '/public/uploads/' . htmlspecialchars($imagen['ruta_imagen']); ?>" 
+                                         alt="<?php echo htmlspecialchars($imagen['descripcion'] ?? $empresa['razon_social']); ?>"
+                                         class="zoom-image"
+                                         data-full-src="<?php echo BASE_URL . '/public/uploads/' . htmlspecialchars($imagen['ruta_imagen']); ?>">
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php if (count($empresa['imagenes']) > 1): ?>
+                            <div class="swiper-button-next"></div>
+                            <div class="swiper-button-prev"></div>
+                            <div class="swiper-pagination"></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php elseif (!empty($empresa['logo'])): ?>
+                    <!-- Logo de la empresa si no tiene imágenes -->
                     <div class="h-48 bg-gray-100 flex items-center justify-center p-4">
                         <img src="<?php echo BASE_URL . '/public/uploads/' . htmlspecialchars($empresa['logo']); ?>" 
                              alt="<?php echo htmlspecialchars($empresa['razon_social']); ?>"
-                             class="max-h-full max-w-full object-contain">
+                             class="max-h-full max-w-full object-contain zoom-image cursor-pointer"
+                             data-full-src="<?php echo BASE_URL . '/public/uploads/' . htmlspecialchars($empresa['logo']); ?>">
                     </div>
                     <?php else: ?>
                     <div class="h-48 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
@@ -222,9 +336,58 @@ $ciudades = $db->query("SELECT DISTINCT ciudad FROM empresas WHERE activo = 1 AN
 
                     <!-- Contenido -->
                     <div class="p-6">
-                        <h3 class="text-xl font-bold text-gray-800 mb-2 line-clamp-2">
-                            <?php echo htmlspecialchars($empresa['razon_social']); ?>
-                        </h3>
+                        <!-- Action Icons Row -->
+                        <div class="flex justify-between items-start mb-3">
+                            <h3 class="text-xl font-bold text-gray-800 line-clamp-2 flex-1">
+                                <?php echo htmlspecialchars($empresa['razon_social']); ?>
+                            </h3>
+                            <div class="flex gap-2 ml-2">
+                                <!-- Ver Detalles -->
+                                <a href="<?php echo BASE_URL; ?>/empresa_detalle.php?id=<?php echo $empresa['id']; ?>" 
+                                   class="action-icon text-blue-600 hover:text-blue-700"
+                                   title="Ver Detalles">
+                                    <i class="fas fa-eye text-lg"></i>
+                                </a>
+                                
+                                <?php if ($is_logged_in): ?>
+                                <!-- Favorito -->
+                                <button class="action-icon text-gray-400 hover:text-red-500 toggle-favorito <?php echo in_array($empresa['id'], $favoritos) ? 'active' : ''; ?>"
+                                        data-empresa-id="<?php echo $empresa['id']; ?>"
+                                        title="<?php echo in_array($empresa['id'], $favoritos) ? 'Quitar de Favoritos' : 'Agregar a Favoritos'; ?>">
+                                    <i class="<?php echo in_array($empresa['id'], $favoritos) ? 'fas' : 'far'; ?> fa-heart text-lg"></i>
+                                </button>
+                                
+                                <!-- Calificar -->
+                                <button class="action-icon text-gray-400 hover:text-yellow-500 open-rating-modal"
+                                        data-empresa-id="<?php echo $empresa['id']; ?>"
+                                        data-empresa-nombre="<?php echo htmlspecialchars($empresa['razon_social']); ?>"
+                                        title="Calificar">
+                                    <i class="fas fa-star text-lg"></i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        
+                        <!-- Rating Display -->
+                        <?php if ($empresa['total_calificaciones'] > 0): ?>
+                        <div class="mb-2 flex items-center gap-2">
+                            <div class="flex text-yellow-500">
+                                <?php
+                                $rating = floatval($empresa['calificacion_promedio']);
+                                for ($i = 1; $i <= 5; $i++) {
+                                    if ($i <= floor($rating)) {
+                                        echo '<i class="fas fa-star text-sm"></i>';
+                                    } elseif ($i - 0.5 <= $rating) {
+                                        echo '<i class="fas fa-star-half-alt text-sm"></i>';
+                                    } else {
+                                        echo '<i class="far fa-star text-sm"></i>';
+                                    }
+                                }
+                                ?>
+                            </div>
+                            <span class="text-xs text-gray-500">(<?php echo $empresa['total_calificaciones']; ?>)</span>
+                        </div>
+                        <?php endif; ?>
                         
                         <?php if ($empresa['sector_nombre']): ?>
                         <div class="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm mb-3">
@@ -384,5 +547,260 @@ $ciudades = $db->query("SELECT DISTINCT ciudad FROM empresas WHERE activo = 1 AN
             </p>
         </div>
     </footer>
+
+    <!-- Modal para zoom de imagen -->
+    <div id="imageModal" class="image-modal">
+        <span class="close-modal" onclick="closeImageModal()">&times;</span>
+        <img id="modalImage" src="" alt="Imagen ampliada">
+    </div>
+
+    <!-- Modal para calificar empresa -->
+    <div id="ratingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Calificar Empresa</h3>
+                <button onclick="closeRatingModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <p id="ratingEmpresaNombre" class="text-gray-600 mb-4"></p>
+            
+            <form id="ratingForm">
+                <input type="hidden" id="ratingEmpresaId" name="empresa_id">
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Calificación</label>
+                    <div class="flex gap-2 text-3xl">
+                        <i class="far fa-star rating-star cursor-pointer" data-rating="1"></i>
+                        <i class="far fa-star rating-star cursor-pointer" data-rating="2"></i>
+                        <i class="far fa-star rating-star cursor-pointer" data-rating="3"></i>
+                        <i class="far fa-star rating-star cursor-pointer" data-rating="4"></i>
+                        <i class="far fa-star rating-star cursor-pointer" data-rating="5"></i>
+                    </div>
+                    <input type="hidden" id="ratingValue" name="calificacion" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Comentario (opcional)</label>
+                    <textarea name="comentario" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                        Enviar Calificación
+                    </button>
+                    <button type="button" onclick="closeRatingModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Swiper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    
+    <script>
+        // Initialize all Swiper instances
+        <?php foreach ($empresas as $empresa): ?>
+        <?php if (!empty($empresa['imagenes']) && count($empresa['imagenes']) > 1): ?>
+        new Swiper('.empresa-swiper-<?php echo $empresa['id']; ?>', {
+            loop: true,
+            pagination: {
+                el: '.swiper-pagination',
+                clickable: true,
+            },
+            navigation: {
+                nextEl: '.swiper-button-next',
+                prevEl: '.swiper-button-prev',
+            },
+            autoplay: {
+                delay: 3000,
+                disableOnInteraction: false,
+            },
+        });
+        <?php endif; ?>
+        <?php endforeach; ?>
+
+        // Image zoom functionality
+        document.querySelectorAll('.zoom-image').forEach(img => {
+            img.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const fullSrc = this.getAttribute('data-full-src') || this.src;
+                document.getElementById('modalImage').src = fullSrc;
+                document.getElementById('imageModal').classList.add('active');
+            });
+        });
+
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.remove('active');
+        }
+
+        // Close modal on click outside image
+        document.getElementById('imageModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeImageModal();
+            }
+        });
+
+        // Close modal on ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeImageModal();
+                closeRatingModal();
+            }
+        });
+
+        <?php if ($is_logged_in): ?>
+        // Toggle favorito
+        document.querySelectorAll('.toggle-favorito').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const empresaId = this.getAttribute('data-empresa-id');
+                const icon = this.querySelector('i');
+                const isActive = this.classList.contains('active');
+                
+                try {
+                    const response = await fetch('<?php echo BASE_URL; ?>/api/toggle_favorito.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ empresa_id: empresaId })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        if (data.action === 'added') {
+                            this.classList.add('active');
+                            icon.classList.remove('far');
+                            icon.classList.add('fas');
+                            this.title = 'Quitar de Favoritos';
+                        } else {
+                            this.classList.remove('active');
+                            icon.classList.remove('fas');
+                            icon.classList.add('far');
+                            this.title = 'Agregar a Favoritos';
+                        }
+                    } else {
+                        alert(data.message || 'Error al actualizar favorito');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error al actualizar favorito');
+                }
+            });
+        });
+
+        // Rating modal
+        let selectedRating = 0;
+        
+        document.querySelectorAll('.open-rating-modal').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const empresaId = this.getAttribute('data-empresa-id');
+                const empresaNombre = this.getAttribute('data-empresa-nombre');
+                
+                document.getElementById('ratingEmpresaId').value = empresaId;
+                document.getElementById('ratingEmpresaNombre').textContent = empresaNombre;
+                document.getElementById('ratingModal').classList.remove('hidden');
+                document.getElementById('ratingModal').classList.add('flex');
+                
+                // Reset stars
+                selectedRating = 0;
+                document.querySelectorAll('.rating-star').forEach(star => {
+                    star.classList.remove('fas');
+                    star.classList.add('far');
+                    star.classList.remove('text-yellow-500');
+                    star.classList.add('text-gray-400');
+                });
+            });
+        });
+
+        function closeRatingModal() {
+            document.getElementById('ratingModal').classList.add('hidden');
+            document.getElementById('ratingModal').classList.remove('flex');
+            document.getElementById('ratingForm').reset();
+            selectedRating = 0;
+        }
+
+        // Star rating interaction
+        document.querySelectorAll('.rating-star').forEach(star => {
+            star.addEventListener('click', function() {
+                selectedRating = parseInt(this.getAttribute('data-rating'));
+                document.getElementById('ratingValue').value = selectedRating;
+                
+                // Update stars display
+                document.querySelectorAll('.rating-star').forEach((s, index) => {
+                    if (index < selectedRating) {
+                        s.classList.remove('far');
+                        s.classList.add('fas');
+                        s.classList.remove('text-gray-400');
+                        s.classList.add('text-yellow-500');
+                    } else {
+                        s.classList.remove('fas');
+                        s.classList.add('far');
+                        s.classList.remove('text-yellow-500');
+                        s.classList.add('text-gray-400');
+                    }
+                });
+            });
+            
+            // Hover effect
+            star.addEventListener('mouseenter', function() {
+                const rating = parseInt(this.getAttribute('data-rating'));
+                document.querySelectorAll('.rating-star').forEach((s, index) => {
+                    if (index < rating) {
+                        s.classList.add('text-yellow-500');
+                    }
+                });
+            });
+            
+            star.addEventListener('mouseleave', function() {
+                document.querySelectorAll('.rating-star').forEach((s, index) => {
+                    if (index >= selectedRating) {
+                        s.classList.remove('text-yellow-500');
+                        s.classList.add('text-gray-400');
+                    }
+                });
+            });
+        });
+
+        // Submit rating form
+        document.getElementById('ratingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (selectedRating === 0) {
+                alert('Por favor selecciona una calificación');
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('<?php echo BASE_URL; ?>/api/calificar_empresa.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('¡Gracias por tu calificación!');
+                    closeRatingModal();
+                    location.reload(); // Reload to show updated rating
+                } else {
+                    alert(result.message || 'Error al enviar calificación');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al enviar calificación');
+            }
+        });
+        <?php endif; ?>
+    </script>
 </body>
 </html>
