@@ -204,9 +204,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             // Verificar si la empresa tiene membresía vigente (no suspendida)
             if ($empresa_id) {
                 $stmt = $db->prepare("
-                    SELECT e.id, e.fecha_renovacion, m.vigencia_meses
+                    SELECT e.id, e.fecha_renovacion
                     FROM empresas e
-                    LEFT JOIN membresias m ON e.membresia_id = m.id
                     WHERE e.id = ? AND e.activo = 1
                 ");
                 $stmt->execute([$empresa_id]);
@@ -214,17 +213,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 
                 if ($empresa_data) {
                     // Verificar vigencia de membresía
+                    // fecha_renovacion es la fecha de vencimiento de la membresía
                     $tiene_membresia_vigente = false;
                     
-                    if ($empresa_data['fecha_renovacion'] && $empresa_data['vigencia_meses']) {
+                    if ($empresa_data['fecha_renovacion']) {
                         $fecha_renovacion = new DateTime($empresa_data['fecha_renovacion']);
-                        $vigencia_meses = intval($empresa_data['vigencia_meses']);
-                        $fecha_vencimiento = clone $fecha_renovacion;
-                        $fecha_vencimiento->modify("+{$vigencia_meses} months");
                         $ahora = new DateTime();
                         
-                        // La membresía está vigente si no ha vencido
-                        $tiene_membresia_vigente = ($ahora <= $fecha_vencimiento);
+                        // La membresía está vigente si la fecha de renovación no ha pasado
+                        $tiene_membresia_vigente = ($ahora <= $fecha_renovacion);
                     }
                     
                     // Solo dar boleto gratis si la membresía está vigente
