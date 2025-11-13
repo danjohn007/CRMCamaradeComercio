@@ -954,8 +954,14 @@ if (!$empresa) {
                         </div>
                         <div>
                             <p class="text-sm text-gray-600">Estatus</p>
-                            <span class="px-3 py-1 rounded-full text-sm font-semibold <?php echo $empresa['activo'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
-                                <?php echo $empresa['activo'] ? 'Activa' : 'Suspendida'; ?>
+                            <?php
+                            // Check if company is truly active based on expiration date
+                            $dias = diasHastaVencimiento($empresa['fecha_renovacion']);
+                            $is_expired = ($dias !== null && $dias < 0);
+                            $is_active = $empresa['activo'] && !$is_expired;
+                            ?>
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold <?php echo $is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; ?>">
+                                <?php echo $is_active ? 'Activa' : 'Inactiva'; ?>
                             </span>
                         </div>
                     </div>
