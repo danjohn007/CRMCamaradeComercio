@@ -201,8 +201,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $boletos_a_pagar = $boletos; // Por defecto, todos los boletos requieren pago
         
         if ($precio_efectivo > 0) {
-            // Verificar si la empresa tiene membresía vigente (no suspendida)
-            if ($empresa_id) {
+            // Verificar si el evento permite acceso gratis a afiliados
+            $permite_acceso_gratis = isset($evento['acceso_gratis_afiliados']) ? (bool)$evento['acceso_gratis_afiliados'] : true;
+            
+            // Solo verificar membresía si el evento permite acceso gratis
+            if ($permite_acceso_gratis && $empresa_id) {
                 $stmt = $db->prepare("
                     SELECT e.id, e.fecha_renovacion
                     FROM empresas e
