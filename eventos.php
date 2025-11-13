@@ -70,9 +70,12 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $monto_total = 0;
                 
                 if ($precio_efectivo > 0) {
-                    // Si la empresa está activa (afiliada), el boleto es gratis
-                    $es_boleto_gratis = $es_empresa_activa;
-                    // Si no es empresa activa, requiere pago
+                    // Verificar si el evento permite acceso gratis a afiliados
+                    $permite_acceso_gratis = isset($evento['acceso_gratis_afiliados']) ? (bool)$evento['acceso_gratis_afiliados'] : true;
+                    
+                    // Si el evento permite acceso gratis Y la empresa está activa, el boleto es gratis
+                    $es_boleto_gratis = $permite_acceso_gratis && $es_empresa_activa;
+                    // Si no es boleto gratis, requiere pago
                     $requiere_pago = !$es_boleto_gratis;
                     $monto_total = $requiere_pago ? $precio_efectivo : 0;
                 }
@@ -168,15 +171,20 @@ if ($action === 'inscribir' && $id && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // Verificar si las columnas de costo y preventa existen en la tabla eventos
 $costo_column_exists = false;
 $preventa_columns_exist = false;
+$acceso_gratis_column_exists = false;
 try {
     $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'costo'");
     $costo_column_exists = $stmt->fetch() !== false;
     
     $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'precio_preventa'");
     $preventa_columns_exist = $stmt->fetch() !== false;
+    
+    $stmt = $db->query("SHOW COLUMNS FROM eventos LIKE 'acceso_gratis_afiliados'");
+    $acceso_gratis_column_exists = $stmt->fetch() !== false;
 } catch (Exception $e) {
     $costo_column_exists = false;
     $preventa_columns_exist = false;
+    $acceso_gratis_column_exists = false;
 }
 
 // Procesar formulario de nuevo evento o edición
@@ -193,6 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
         'precio_preventa' => ($preventa_columns_exist && isset($_POST['precio_preventa']) && $_POST['precio_preventa'] !== '') ? (float)$_POST['precio_preventa'] : null,
         'fecha_limite_preventa' => ($preventa_columns_exist && !empty($_POST['fecha_limite_preventa'])) ? $_POST['fecha_limite_preventa'] : null,
         'requiere_inscripcion' => isset($_POST['requiere_inscripcion']) ? 1 : 0,
+        'acceso_gratis_afiliados' => ($acceso_gratis_column_exists && isset($_POST['acceso_gratis_afiliados'])) ? 1 : 0,
         'imagen' => null
     ];
 
@@ -209,8 +218,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
     if (!$error) {
         try {
             if ($action === 'new') {
-                // Construir SQL dinámicamente basado en si existen las columnas costo y preventa
-                if ($costo_column_exists && $preventa_columns_exist) {
+                // Construir SQL dinámicamente basado en si existen las columnas costo, preventa y acceso_gratis
+                if ($costo_column_exists && $preventa_columns_exist && $acceso_gratis_column_exists) {
+                    $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, precio_preventa, fecha_limite_preventa, imagen, requiere_inscripcion, acceso_gratis_afiliados, creado_por) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params = [
+                        $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                        $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], 
+                        $data['precio_preventa'], $data['fecha_limite_preventa'], $data['imagen'],
+                        $data['requiere_inscripcion'], $data['acceso_gratis_afiliados'], $user['id']
+                    ];
+                } elseif ($costo_column_exists && $preventa_columns_exist) {
                     $sql = "INSERT INTO eventos (titulo, descripcion, fecha_inicio, fecha_fin, ubicacion, tipo, cupo_maximo, costo, precio_preventa, fecha_limite_preventa, imagen, requiere_inscripcion, creado_por) 
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     $params = [
@@ -246,7 +264,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
                 // UPDATE para edición
                 if ($data['imagen']) {
                     // Con nueva imagen
-                    if ($costo_column_exists && $preventa_columns_exist) {
+                    if ($costo_column_exists && $preventa_columns_exist && $acceso_gratis_column_exists) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, precio_preventa = ?, fecha_limite_preventa = ?, imagen = ?, requiere_inscripcion = ?, acceso_gratis_afiliados = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'], 
+                            $data['precio_preventa'], $data['fecha_limite_preventa'], $data['imagen'],
+                            $data['requiere_inscripcion'], $data['acceso_gratis_afiliados'], $id
+                        ];
+                    } elseif ($costo_column_exists && $preventa_columns_exist) {
                         $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
                                 ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, precio_preventa = ?, fecha_limite_preventa = ?, imagen = ?, requiere_inscripcion = ? WHERE id = ?";
                         $params = [
@@ -274,7 +301,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']) 
                     }
                 } else {
                     // Sin nueva imagen
-                    if ($costo_column_exists && $preventa_columns_exist) {
+                    if ($costo_column_exists && $preventa_columns_exist && $acceso_gratis_column_exists) {
+                        $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
+                                ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, precio_preventa = ?, fecha_limite_preventa = ?, requiere_inscripcion = ?, acceso_gratis_afiliados = ? WHERE id = ?";
+                        $params = [
+                            $data['titulo'], $data['descripcion'], $data['fecha_inicio'], $data['fecha_fin'],
+                            $data['ubicacion'], $data['tipo'], $data['cupo_maximo'], $data['costo'],
+                            $data['precio_preventa'], $data['fecha_limite_preventa'],
+                            $data['requiere_inscripcion'], $data['acceso_gratis_afiliados'], $id
+                        ];
+                    } elseif ($costo_column_exists && $preventa_columns_exist) {
                         $sql = "UPDATE eventos SET titulo = ?, descripcion = ?, fecha_inicio = ?, fecha_fin = ?, 
                                 ubicacion = ?, tipo = ?, cupo_maximo = ?, costo = ?, precio_preventa = ?, fecha_limite_preventa = ?, requiere_inscripcion = ? WHERE id = ?";
                         $params = [
@@ -814,6 +850,22 @@ include __DIR__ . '/app/views/layouts/header.php';
                             <i class="fas fa-info-circle mr-1"></i>
                             Después de esta fecha, se cobrará el precio regular
                         </p>
+                    </div>
+                    
+                    <!-- Acceso gratis para afiliados -->
+                    <div class="mt-4 border-t pt-4">
+                        <label class="flex items-start">
+                            <input type="checkbox" name="acceso_gratis_afiliados" value="1"
+                                   <?php echo (!isset($evento['acceso_gratis_afiliados']) || $evento['acceso_gratis_afiliados']) ? 'checked' : ''; ?>
+                                   class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-3">
+                                <span class="block text-gray-700 font-semibold">Acceso gratis para afiliados vigentes</span>
+                                <span class="block text-sm text-gray-600 mt-1">
+                                    Si está marcado, los afiliados con membresía vigente recibirán 1 boleto gratis.
+                                    Si no está marcado, todos los asistentes deberán pagar (incluyendo afiliados).
+                                </span>
+                            </span>
+                        </label>
                     </div>
                 </div>
 
