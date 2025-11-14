@@ -37,9 +37,9 @@ define('MAX_FILE_SIZE', 5242880); // 5MB en bytes
 
 // Configuración de la base de datos
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'agenciae_canaco');
-define('DB_USER', 'agenciae_canaco');
-define('DB_PASS', 'Danjohn007!');
+define('DB_NAME', 'enlaceca_crm');
+define('DB_USER', 'enlaceca_crm');
+define('DB_PASS', 'N=bf+mY0Vljt');
 define('DB_CHARSET', 'utf8mb4');
 
 // Configuración de sesión
