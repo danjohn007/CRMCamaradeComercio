@@ -131,10 +131,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                         $membresia_id = $result['id'];
                     }
                     
-                    // Obtener ID del vendedor si se proporcionó nombre
+                    // Obtener ID del vendedor/afiliador si se proporcionó nombre
+                    // Buscar en la tabla usuarios con rol AFILADOR (no en vendedores)
                     $vendedor_id = null;
                     if (!empty($vendedor)) {
-                        $stmt = $db->prepare("SELECT id FROM vendedores WHERE nombre = ? LIMIT 1");
+                        $stmt = $db->prepare("SELECT id FROM usuarios WHERE nombre = ? AND rol = 'AFILADOR' AND activo = 1 LIMIT 1");
                         $stmt->execute([$vendedor]);
                         $result = $stmt->fetch();
                         if ($result) {
