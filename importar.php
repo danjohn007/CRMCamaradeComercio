@@ -156,8 +156,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                             $vendedor_id = $result['id'];
                         } else {
                             // Intentar búsqueda parcial (por si hay diferencias en el nombre)
+                            // Escapar caracteres especiales de LIKE para prevenir LIKE injection
+                            $vendedor_escaped = str_replace(['%', '_'], ['\%', '\_'], $vendedor);
                             $stmt = $db->prepare("SELECT id FROM usuarios WHERE nombre LIKE ? AND rol = 'AFILADOR' AND activo = 1 LIMIT 1");
-                            $stmt->execute(['%' . $vendedor . '%']);
+                            $stmt->execute(['%' . $vendedor_escaped . '%']);
                             $result = $stmt->fetch();
                             if ($result) {
                                 $vendedor_id = $result['id'];
