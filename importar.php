@@ -1,6 +1,11 @@
 <?php
 /**
  * Módulo de importación de datos desde Excel/CSV
+ * 
+ * IMPORTANTE: El campo VENDEDOR debe coincidir con el nombre de un usuario
+ * activo con rol AFILADOR en la tabla usuarios. El sistema intentará hacer
+ * una búsqueda exacta primero y luego una búsqueda parcial si no encuentra
+ * coincidencia exacta.
  */
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
@@ -105,12 +110,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                     }
                     
                     // Obtener IDs de catálogos
+                    $warnings = [];
+                    
                     $sector_id = null;
                     $stmt = $db->prepare("SELECT id FROM sectores WHERE nombre = ? LIMIT 1");
                     $stmt->execute([$sector]);
                     $result = $stmt->fetch();
                     if ($result) {
                         $sector_id = $result['id'];
+                    } else if (!empty($sector)) {
+                        $warnings[] = "Sector '$sector' no encontrado";
                     }
                     
                     $categoria_id = null;
@@ -120,6 +129,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                         $result = $stmt->fetch();
                         if ($result) {
                             $categoria_id = $result['id'];
+                        } else {
+                            $warnings[] = "Categoría '$categoria' no encontrada";
                         }
                     }
                     
@@ -129,17 +140,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                     $result = $stmt->fetch();
                     if ($result) {
                         $membresia_id = $result['id'];
+                    } else if (!empty($membresia)) {
+                        $warnings[] = "Membresía '$membresia' no encontrada";
                     }
                     
                     // Obtener ID del vendedor/afiliador si se proporcionó nombre
-                    // Buscar en la tabla usuarios con rol AFILADOR (no en vendedores)
+                    // Buscar en la tabla usuarios con rol AFILADOR
                     $vendedor_id = null;
                     if (!empty($vendedor)) {
+                        // Intentar búsqueda exacta primero
                         $stmt = $db->prepare("SELECT id FROM usuarios WHERE nombre = ? AND rol = 'AFILADOR' AND activo = 1 LIMIT 1");
                         $stmt->execute([$vendedor]);
                         $result = $stmt->fetch();
                         if ($result) {
                             $vendedor_id = $result['id'];
+                        } else {
+                            // Intentar búsqueda parcial (por si hay diferencias en el nombre)
+                            $stmt = $db->prepare("SELECT id FROM usuarios WHERE nombre LIKE ? AND rol = 'AFILADOR' AND activo = 1 LIMIT 1");
+                            $stmt->execute(['%' . $vendedor . '%']);
+                            $result = $stmt->fetch();
+                            if ($result) {
+                                $vendedor_id = $result['id'];
+                            } else {
+                                $warnings[] = "Vendedor/Afiliador '$vendedor' no encontrado";
+                            }
                         }
                     }
                     
@@ -163,10 +187,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivo'])) {
                         
                         $empresa_id = $db->lastInsertId();
                         
+                        $mensaje_success = 'Importado correctamente';
+                        if (!empty($warnings)) {
+                            $mensaje_success .= ' (Advertencias: ' . implode(', ', $warnings) . ')';
+                        }
+                        
                         $results[] = [
                             'empresa' => $empresa,
                             'status' => 'success',
-                            'mensaje' => 'Importado correctamente'
+                            'mensaje' => $mensaje_success
                         ];
                         $importados++;
                         
