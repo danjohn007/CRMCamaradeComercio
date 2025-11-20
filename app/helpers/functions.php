@@ -115,6 +115,12 @@ function formatDate($date, $format = 'd/m/Y') {
  * Formatear moneda
  */
 function formatMoney($amount) {
+    // Handle NULL and empty values
+    if ($amount === null || $amount === '') {
+        return 'N/A';
+    }
+    // Convert to float to ensure proper formatting
+    $amount = floatval($amount);
     return '$' . number_format($amount, 2, '.', ',');
 }
 
