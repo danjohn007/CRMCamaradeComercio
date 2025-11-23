@@ -314,7 +314,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                     </span>
                     <!-- Badge Calidad CANACO -->
                     <?php if ($completitud['tiene_calidad_canaco']): ?>
-                    <span class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white rounded-full text-sm font-bold shadow-lg animate-pulse">
+                    <span class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white rounded-full text-sm font-bold shadow-lg">
                         <i class="fas fa-award mr-2"></i>Calidad CANACO
                     </span>
                     <?php endif; ?>

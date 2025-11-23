@@ -447,13 +447,17 @@ function calcularCompletitudPerfil($empresa) {
     $campos_completados = 0;
     
     foreach ($campos_verificar as $campo) {
-        if (isset($empresa[$campo]) && !empty(trim($empresa[$campo]))) {
-            $campos_completados++;
+        if (isset($empresa[$campo]) && $empresa[$campo] !== null && $empresa[$campo] !== '') {
+            // Convert to string for trim to avoid type errors
+            $valor = (string)$empresa[$campo];
+            if (!empty(trim($valor))) {
+                $campos_completados++;
+            }
         }
     }
     
     $porcentaje = $campos_totales > 0 ? ($campos_completados * 100) / $campos_totales : 0;
-    $tiene_calidad_canaco = ($porcentaje >= 100);
+    $tiene_calidad_canaco = (round($porcentaje, 2) === 100.0);
     
     return [
         'campos_totales' => $campos_totales,
