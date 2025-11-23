@@ -399,3 +399,66 @@ function actualizarEstadoEmpresasPorVencimiento($empresa_id = null) {
         return 0;
     }
 }
+
+/**
+ * Calcular porcentaje de completitud del perfil de empresa
+ * 
+ * Excluye: vendedor_id (afiliador) y no_registro
+ * 
+ * @param array $empresa Datos de la empresa
+ * @return array Array con campos_totales, campos_completados, porcentaje, tiene_calidad_canaco
+ */
+function calcularCompletitudPerfil($empresa) {
+    if (!$empresa) {
+        return [
+            'campos_totales' => 0,
+            'campos_completados' => 0,
+            'porcentaje' => 0,
+            'tiene_calidad_canaco' => false
+        ];
+    }
+    
+    // Definir campos a verificar (excluyendo vendedor_id y no_registro)
+    $campos_verificar = [
+        'razon_social',
+        'rfc',
+        'email',
+        'telefono',
+        'whatsapp',
+        'representante',
+        'direccion_comercial',
+        'direccion_fiscal',
+        'colonia',
+        'ciudad',
+        'codigo_postal',
+        'estado',
+        'sector_id',
+        'categoria_id',
+        'membresia_id',
+        'descripcion',
+        'servicios_productos',
+        'palabras_clave',
+        'sitio_web',
+        'facebook',
+        'instagram'
+    ];
+    
+    $campos_totales = count($campos_verificar);
+    $campos_completados = 0;
+    
+    foreach ($campos_verificar as $campo) {
+        if (isset($empresa[$campo]) && !empty(trim($empresa[$campo]))) {
+            $campos_completados++;
+        }
+    }
+    
+    $porcentaje = $campos_totales > 0 ? ($campos_completados * 100) / $campos_totales : 0;
+    $tiene_calidad_canaco = ($porcentaje >= 100);
+    
+    return [
+        'campos_totales' => $campos_totales,
+        'campos_completados' => $campos_completados,
+        'porcentaje' => round($porcentaje, 2),
+        'tiene_calidad_canaco' => $tiene_calidad_canaco
+    ];
+}
