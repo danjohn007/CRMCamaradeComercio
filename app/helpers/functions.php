@@ -477,8 +477,12 @@ function actualizarPorcentajeCompletitud($empresa_id) {
     try {
         $db = Database::getInstance()->getConnection();
         
-        // Obtener datos de la empresa
-        $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
+        // Obtener solo los campos necesarios para el cálculo (optimizado para performance)
+        $stmt = $db->prepare("SELECT razon_social, rfc, email, telefono, whatsapp, representante, 
+                               direccion_comercial, direccion_fiscal, colonia, ciudad, codigo_postal, estado,
+                               sector_id, categoria_id, membresia_id, descripcion, servicios_productos, 
+                               palabras_clave, sitio_web, facebook, instagram 
+                               FROM empresas WHERE id = ?");
         $stmt->execute([$empresa_id]);
         $empresa = $stmt->fetch();
         

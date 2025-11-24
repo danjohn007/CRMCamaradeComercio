@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS salon_reservas (
     FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     INDEX idx_salon_fecha (salon_id, fecha_inicio, fecha_fin),
+    INDEX idx_salon_fecha_estado (salon_id, fecha_inicio, fecha_fin, estado),
     INDEX idx_estado (estado),
     INDEX idx_empresa (empresa_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
