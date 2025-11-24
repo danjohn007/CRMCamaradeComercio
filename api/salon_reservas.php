@@ -42,31 +42,55 @@ try {
             $nivel_membresia = null;
             
             if ($empresa_id) {
-                $stmt = $db->prepare("
-                    SELECT e.membresia_id, m.nombre as nombre_membresia, m.descuento_salones
-                    FROM empresas e
-                    LEFT JOIN membresias m ON e.membresia_id = m.id
-                    WHERE e.id = ? AND e.activo = 1
-                ");
-                $stmt->execute([$empresa_id]);
-                $empresa = $stmt->fetch();
-                
-                if ($empresa && $empresa['membresia_id']) {
-                    $es_afiliado = true;
-                    $descuento_porcentaje = floatval($empresa['descuento_salones'] ?? 0);
-                    $nivel_membresia = $empresa['nombre_membresia'];
+                // Check if membresias has descuento_salones column
+                try {
+                    $stmt = $db->prepare("
+                        SELECT e.membresia_id, m.nombre as nombre_membresia, m.descuento_salones
+                        FROM empresas e
+                        LEFT JOIN membresias m ON e.membresia_id = m.id
+                        WHERE e.id = ? AND e.activo = 1
+                    ");
+                    $stmt->execute([$empresa_id]);
+                    $empresa = $stmt->fetch();
+                    
+                    if ($empresa && $empresa['membresia_id']) {
+                        $es_afiliado = true;
+                        $descuento_porcentaje = floatval($empresa['descuento_salones'] ?? 0);
+                        $nivel_membresia = $empresa['nombre_membresia'];
+                    }
+                } catch (PDOException $e) {
+                    // descuento_salones column doesn't exist, try without it
+                    $stmt = $db->prepare("
+                        SELECT e.membresia_id, m.nombre as nombre_membresia
+                        FROM empresas e
+                        LEFT JOIN membresias m ON e.membresia_id = m.id
+                        WHERE e.id = ? AND e.activo = 1
+                    ");
+                    $stmt->execute([$empresa_id]);
+                    $empresa = $stmt->fetch();
+                    
+                    if ($empresa && $empresa['membresia_id']) {
+                        $es_afiliado = true;
+                        $nivel_membresia = $empresa['nombre_membresia'];
+                    }
                 }
             }
             
             // Seleccionar el precio según tipo de tarifa y afiliación
-            $campo_precio = '';
-            if ($es_afiliado) {
-                $campo_precio = "precio_{$tipo_tarifa}_afiliado";
-            } else {
-                $campo_precio = "precio_{$tipo_tarifa}_no_afiliado";
-            }
+            // First try enhanced pricing columns, fallback to basic pricing
+            $monto_total = 0;
+            $campo_precio_afiliado = "precio_{$tipo_tarifa}_afiliado";
+            $campo_precio_no_afiliado = "precio_{$tipo_tarifa}_no_afiliado";
+            $campo_precio_base = "precio_{$tipo_tarifa}";
             
-            $monto_total = floatval($salon[$campo_precio] ?? 0);
+            if ($es_afiliado && isset($salon[$campo_precio_afiliado]) && floatval($salon[$campo_precio_afiliado]) > 0) {
+                $monto_total = floatval($salon[$campo_precio_afiliado]);
+            } elseif (!$es_afiliado && isset($salon[$campo_precio_no_afiliado]) && floatval($salon[$campo_precio_no_afiliado]) > 0) {
+                $monto_total = floatval($salon[$campo_precio_no_afiliado]);
+            } elseif (isset($salon[$campo_precio_base])) {
+                // Fallback to base price
+                $monto_total = floatval($salon[$campo_precio_base]);
+            }
             
             // Calcular descuento
             $monto_descuento = ($monto_total * $descuento_porcentaje) / 100;
@@ -140,42 +164,86 @@ try {
             $nivel_membresia = null;
             
             if ($empresa_id) {
-                $stmt = $db->prepare("
-                    SELECT e.membresia_id, m.nombre as nombre_membresia, m.descuento_salones
-                    FROM empresas e
-                    LEFT JOIN membresias m ON e.membresia_id = m.id
-                    WHERE e.id = ? AND e.activo = 1
-                ");
-                $stmt->execute([$empresa_id]);
-                $empresa = $stmt->fetch();
-                
-                if ($empresa && $empresa['membresia_id']) {
-                    $es_afiliado = true;
-                    $descuento_porcentaje = floatval($empresa['descuento_salones'] ?? 0);
-                    $nivel_membresia = $empresa['nombre_membresia'];
+                // Check if membresias has descuento_salones column
+                try {
+                    $stmt = $db->prepare("
+                        SELECT e.membresia_id, m.nombre as nombre_membresia, m.descuento_salones
+                        FROM empresas e
+                        LEFT JOIN membresias m ON e.membresia_id = m.id
+                        WHERE e.id = ? AND e.activo = 1
+                    ");
+                    $stmt->execute([$empresa_id]);
+                    $empresa = $stmt->fetch();
+                    
+                    if ($empresa && $empresa['membresia_id']) {
+                        $es_afiliado = true;
+                        $descuento_porcentaje = floatval($empresa['descuento_salones'] ?? 0);
+                        $nivel_membresia = $empresa['nombre_membresia'];
+                    }
+                } catch (PDOException $e) {
+                    // descuento_salones column doesn't exist, try without it
+                    $stmt = $db->prepare("
+                        SELECT e.membresia_id, m.nombre as nombre_membresia
+                        FROM empresas e
+                        LEFT JOIN membresias m ON e.membresia_id = m.id
+                        WHERE e.id = ? AND e.activo = 1
+                    ");
+                    $stmt->execute([$empresa_id]);
+                    $empresa = $stmt->fetch();
+                    
+                    if ($empresa && $empresa['membresia_id']) {
+                        $es_afiliado = true;
+                        $nivel_membresia = $empresa['nombre_membresia'];
+                    }
                 }
             }
             
-            $campo_precio = $es_afiliado ? "precio_{$tipo_tarifa}_afiliado" : "precio_{$tipo_tarifa}_no_afiliado";
-            $monto_total = floatval($salon[$campo_precio] ?? 0);
+            // Calculate price with fallback for missing columns
+            $campo_precio_afiliado = "precio_{$tipo_tarifa}_afiliado";
+            $campo_precio_no_afiliado = "precio_{$tipo_tarifa}_no_afiliado";
+            $campo_precio_base = "precio_{$tipo_tarifa}";
+            
+            $monto_total = 0;
+            if ($es_afiliado && isset($salon[$campo_precio_afiliado]) && floatval($salon[$campo_precio_afiliado]) > 0) {
+                $monto_total = floatval($salon[$campo_precio_afiliado]);
+            } elseif (!$es_afiliado && isset($salon[$campo_precio_no_afiliado]) && floatval($salon[$campo_precio_no_afiliado]) > 0) {
+                $monto_total = floatval($salon[$campo_precio_no_afiliado]);
+            } elseif (isset($salon[$campo_precio_base])) {
+                $monto_total = floatval($salon[$campo_precio_base]);
+            }
+            
             $monto_descuento = ($monto_total * $descuento_porcentaje) / 100;
             $monto_final = $monto_total - $monto_descuento;
             
-            // Crear reserva
-            $sql = "INSERT INTO salon_reservas (
-                salon_id, empresa_id, usuario_id, fecha_inicio, fecha_fin,
-                proposito, contacto_nombre, contacto_email, contacto_telefono, notas,
-                estado, monto_total, descuento_porcentaje, monto_descuento, monto_final,
-                es_afiliado, nivel_membresia
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?, ?, ?)";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute([
-                $salon_id, $empresa_id, $user['id'], $fecha_inicio, $fecha_fin,
-                $proposito, $contacto_nombre, $contacto_email, $contacto_telefono, $notas,
-                $monto_total, $descuento_porcentaje, $monto_descuento, $monto_final,
-                $es_afiliado ? 1 : 0, $nivel_membresia
-            ]);
+            // Crear reserva - try with enhanced columns first, fallback to basic columns
+            try {
+                $sql = "INSERT INTO salon_reservas (
+                    salon_id, empresa_id, usuario_id, fecha_inicio, fecha_fin,
+                    proposito, contacto_nombre, contacto_email, contacto_telefono, notas,
+                    estado, monto_total, descuento_porcentaje, monto_descuento, monto_final,
+                    es_afiliado, nivel_membresia
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?, ?, ?)";
+                
+                $stmt = $db->prepare($sql);
+                $stmt->execute([
+                    $salon_id, $empresa_id, $user['id'], $fecha_inicio, $fecha_fin,
+                    $proposito, $contacto_nombre, $contacto_email, $contacto_telefono, $notas,
+                    $monto_total, $descuento_porcentaje, $monto_descuento, $monto_final,
+                    $es_afiliado ? 1 : 0, $nivel_membresia
+                ]);
+            } catch (PDOException $e) {
+                // Enhanced columns don't exist, use basic insert
+                $sql = "INSERT INTO salon_reservas (
+                    salon_id, empresa_id, usuario_id, fecha_inicio, fecha_fin,
+                    proposito, contacto_nombre, contacto_email, contacto_telefono, notas, estado
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE')";
+                
+                $stmt = $db->prepare($sql);
+                $stmt->execute([
+                    $salon_id, $empresa_id, $user['id'], $fecha_inicio, $fecha_fin,
+                    $proposito, $contacto_nombre, $contacto_email, $contacto_telefono, $notas
+                ]);
+            }
             
             $reserva_id = $db->lastInsertId();
             
