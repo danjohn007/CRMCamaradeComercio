@@ -211,6 +211,10 @@ if (in_array($action, ['new', 'edit'])) {
                 $stmt->execute([$id]);
                 $salon_imagenes = $stmt->fetchAll();
             } catch (PDOException $e) {
+                // Only ignore "table doesn't exist" error (42S02), rethrow others
+                if ($e->getCode() !== '42S02') {
+                    throw $e;
+                }
                 // salon_imagenes table doesn't exist - migration not applied, continue with empty array
             }
         }
@@ -243,6 +247,10 @@ if ($action === 'view' && $id) {
             $stmt->execute([$id]);
             $salon_imagenes = $stmt->fetchAll();
         } catch (PDOException $e) {
+            // Only ignore "table doesn't exist" error (42S02), rethrow others
+            if ($e->getCode() !== '42S02') {
+                throw $e;
+            }
             // salon_imagenes table doesn't exist - migration not applied, continue with empty array
         }
         

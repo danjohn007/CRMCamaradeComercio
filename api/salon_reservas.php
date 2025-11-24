@@ -60,6 +60,10 @@ try {
                         $nivel_membresia = $empresa['nombre_membresia'];
                     }
                 } catch (PDOException $e) {
+                    // Only handle "unknown column" error (42S22), rethrow others
+                    if ($e->getCode() !== '42S22') {
+                        throw $e;
+                    }
                     // descuento_salones column doesn't exist - migration not applied
                     // Fallback to basic query without discount column
                     $stmt = $db->prepare("
@@ -184,6 +188,10 @@ try {
                         $nivel_membresia = $empresa['nombre_membresia'];
                     }
                 } catch (PDOException $e) {
+                    // Only handle "unknown column" error (42S22), rethrow others
+                    if ($e->getCode() !== '42S22') {
+                        throw $e;
+                    }
                     // descuento_salones column doesn't exist - migration not applied
                     // Fallback to basic query without discount column
                     $stmt = $db->prepare("
@@ -239,6 +247,10 @@ try {
                     $es_afiliado ? 1 : 0, $nivel_membresia
                 ]);
             } catch (PDOException $e) {
+                // Only handle "unknown column" error (42S22), rethrow others
+                if ($e->getCode() !== '42S22') {
+                    throw $e;
+                }
                 // Enhanced columns don't exist - migration not applied
                 // Use basic insert with columns from original 20251124_add_salones_module.sql
                 $sql = "INSERT INTO salon_reservas (
