@@ -34,15 +34,8 @@ try {
         throw new Exception('Inscripción no encontrada');
     }
     
-    // Usar el monto que ya fue calculado en evento_publico.php (incluye preventa y boleto gratis)
-    $monto_total = floatval($inscripcion['monto_pagado'] ?? 0);
-    
-    // Si monto_pagado es 0 o null, recalcular basado en costo del evento y cantidad de boletos
-    if ($monto_total <= 0) {
-        $boletos_solicitados = intval($inscripcion['boletos_solicitados'] ?? 1);
-        $costo_evento = floatval($inscripcion['costo'] ?? 0);
-        $monto_total = $costo_evento * $boletos_solicitados;
-    }
+    // Calculate payment amount using shared helper function
+    $monto_total = calcularMontoPagoEvento($inscripcion);
     
     // Verificar que haya monto a pagar
     if ($monto_total <= 0) {

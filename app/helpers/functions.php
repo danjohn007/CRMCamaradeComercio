@@ -393,3 +393,26 @@ function actualizarEstadoEmpresasPorVencimiento($empresa_id = null) {
         return 0;
     }
 }
+
+/**
+ * Calculate the payment amount for an event inscription
+ * 
+ * Uses monto_pagado if set and > 0, otherwise calculates from event cost × tickets
+ * 
+ * @param array $inscripcion Array with inscription data (monto_pagado, boletos_solicitados)
+ * @param float|null $costo_evento Event cost (optional, if not included in inscripcion array)
+ * @return float The calculated payment amount
+ */
+function calcularMontoPagoEvento($inscripcion, $costo_evento = null) {
+    // First try to use the stored monto_pagado
+    $monto = floatval($inscripcion['monto_pagado'] ?? 0);
+    
+    // If monto_pagado is not set or is 0, calculate from event cost × tickets
+    if ($monto <= 0) {
+        $boletos = intval($inscripcion['boletos_solicitados'] ?? 1);
+        $costo = $costo_evento ?? floatval($inscripcion['costo'] ?? 0);
+        $monto = $costo * $boletos;
+    }
+    
+    return $monto;
+}
