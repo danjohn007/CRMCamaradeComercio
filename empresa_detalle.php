@@ -48,6 +48,9 @@ $stmt = $db->prepare("
 ");
 $stmt->execute([$empresa_id]);
 $calificaciones = $stmt->fetchAll();
+
+// Calcular completitud del perfil
+$completitud = calcularCompletitudPerfil($empresa);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -108,15 +111,46 @@ $calificaciones = $stmt->fetchAll();
             <div class="p-8">
                 <!-- Company Header -->
                 <div class="mb-6">
-                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                        <?php echo htmlspecialchars($empresa['razon_social']); ?>
-                    </h1>
+                    <div class="flex items-start justify-between flex-wrap gap-4">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                                <?php echo htmlspecialchars($empresa['razon_social']); ?>
+                            </h1>
+                            
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <?php if ($empresa['sector_nombre']): ?>
+                                <span class="inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                                    <?php echo htmlspecialchars($empresa['sector_nombre']); ?>
+                                </span>
+                                <?php endif; ?>
+                                
+                                <!-- Badge Calidad CANACO -->
+                                <?php if ($completitud['tiene_calidad_canaco']): ?>
+                                <span class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white rounded-full text-sm font-bold shadow-lg">
+                                    <i class="fas fa-award mr-2"></i>Calidad CANACO
+                                </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <?php if ($empresa['sector_nombre']): ?>
-                    <span class="inline-block px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-                        <?php echo htmlspecialchars($empresa['sector_nombre']); ?>
-                    </span>
-                    <?php endif; ?>
+                    <!-- Barra de Progreso de Perfil -->
+                    <div class="mt-4 bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-semibold text-gray-700">Completitud del Perfil</span>
+                            <span class="text-sm font-bold text-blue-600">
+                                <?php echo number_format($completitud['porcentaje'], 0); ?>%
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div class="h-3 rounded-full transition-all duration-500 <?php echo $completitud['tiene_calidad_canaco'] ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'; ?>"
+                                 style="width: <?php echo $completitud['porcentaje']; ?>%">
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            <?php echo $completitud['campos_completados']; ?> de <?php echo $completitud['campos_totales']; ?> campos completados
+                        </p>
+                    </div>
                     
                     <!-- Rating Display -->
                     <?php if ($empresa['total_calificaciones'] > 0): ?>
