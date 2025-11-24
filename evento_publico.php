@@ -186,6 +186,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($registro_existente && isset($_POST['compra_adicional'])) {
             $inscripcion_id = $registro_existente['id'];
             
+            // Calcular precio efectivo para boletos adicionales
+            $precio_efectivo = $evento['costo'];
+            $ahora = new DateTime();
+            
+            // Si hay precio de preventa y aún no pasó la fecha límite, usar precio de preventa
+            if (isset($evento['precio_preventa']) && $evento['precio_preventa'] > 0 && 
+                !empty($evento['fecha_limite_preventa'])) {
+                $fecha_limite = new DateTime($evento['fecha_limite_preventa']);
+                if ($ahora <= $fecha_limite) {
+                    $precio_efectivo = $evento['precio_preventa'];
+                }
+            }
+            
+            // Para boletos adicionales, todos requieren pago si el evento tiene costo
+            $requiere_pago = ($precio_efectivo > 0);
+            $monto_total = $requiere_pago ? ($precio_efectivo * $boletos) : 0;
+            
             // Actualizar boletos solicitados y monto
             $nuevos_boletos_totales = $registro_existente['boletos_solicitados'] + $boletos;
             $nuevo_monto_total = $monto_total; // Solo cobrar por los boletos adicionales
