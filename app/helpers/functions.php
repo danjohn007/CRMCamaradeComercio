@@ -466,3 +466,36 @@ function calcularCompletitudPerfil($empresa) {
         'tiene_calidad_canaco' => $tiene_calidad_canaco
     ];
 }
+
+/**
+ * Actualizar porcentaje de completitud del perfil en base de datos
+ * 
+ * @param int $empresa_id ID de la empresa
+ * @return bool True si se actualizó correctamente
+ */
+function actualizarPorcentajeCompletitud($empresa_id) {
+    try {
+        $db = Database::getInstance()->getConnection();
+        
+        // Obtener datos de la empresa
+        $stmt = $db->prepare("SELECT * FROM empresas WHERE id = ?");
+        $stmt->execute([$empresa_id]);
+        $empresa = $stmt->fetch();
+        
+        if (!$empresa) {
+            return false;
+        }
+        
+        // Calcular completitud
+        $completitud = calcularCompletitudPerfil($empresa);
+        
+        // Actualizar en base de datos
+        $stmt = $db->prepare("UPDATE empresas SET perfil_completado_porcentaje = ? WHERE id = ?");
+        $stmt->execute([$completitud['porcentaje'], $empresa_id]);
+        
+        return true;
+    } catch (Exception $e) {
+        error_log("Error al actualizar porcentaje de completitud: " . $e->getMessage());
+        return false;
+    }
+}
