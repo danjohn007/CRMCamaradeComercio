@@ -403,7 +403,12 @@ function actualizarEstadoEmpresasPorVencimiento($empresa_id = null) {
 /**
  * Calcular porcentaje de completitud del perfil de empresa
  * 
- * Excluye: vendedor_id (afiliador) y no_registro
+ * Solo cuenta los campos específicos mostrados en las imágenes del sistema:
+ * - Email, Teléfono, WhatsApp, Representante Legal
+ * - Dirección Comercial, Colonia (Dirección Comercial)
+ * - Dirección Fiscal, Colonia (Dirección Fiscal), Ciudad, Código Postal, Estado
+ * - Sector, Categoría
+ * - Descripción de la Empresa, Servicios y Productos, Palabras Clave
  * 
  * @param array $empresa Datos de la empresa
  * @return array Array con campos_totales, campos_completados, porcentaje, tiene_calidad_canaco
@@ -418,29 +423,24 @@ function calcularCompletitudPerfil($empresa) {
         ];
     }
     
-    // Definir campos a verificar (excluyendo vendedor_id y no_registro)
+    // Definir campos a verificar según los mostrados en las imágenes del sistema
     $campos_verificar = [
-        'razon_social',
-        'rfc',
         'email',
         'telefono',
         'whatsapp',
         'representante',
         'direccion_comercial',
+        'colonia',  // Colonia de dirección comercial
         'direccion_fiscal',
-        'colonia',
+        'colonia_fiscal',
         'ciudad',
         'codigo_postal',
         'estado',
         'sector_id',
         'categoria_id',
-        'membresia_id',
         'descripcion',
         'servicios_productos',
-        'palabras_clave',
-        'sitio_web',
-        'facebook',
-        'instagram'
+        'palabras_clave'
     ];
     
     $campos_totales = count($campos_verificar);
@@ -478,10 +478,10 @@ function actualizarPorcentajeCompletitud($empresa_id) {
         $db = Database::getInstance()->getConnection();
         
         // Obtener solo los campos necesarios para el cálculo (optimizado para performance)
-        $stmt = $db->prepare("SELECT razon_social, rfc, email, telefono, whatsapp, representante, 
-                               direccion_comercial, direccion_fiscal, colonia, ciudad, codigo_postal, estado,
-                               sector_id, categoria_id, membresia_id, descripcion, servicios_productos, 
-                               palabras_clave, sitio_web, facebook, instagram 
+        $stmt = $db->prepare("SELECT email, telefono, whatsapp, representante, 
+                               direccion_comercial, colonia, direccion_fiscal, colonia_fiscal, 
+                               ciudad, codigo_postal, estado, sector_id, categoria_id, 
+                               descripcion, servicios_productos, palabras_clave 
                                FROM empresas WHERE id = ?");
         $stmt->execute([$empresa_id]);
         $empresa = $stmt->fetch();
