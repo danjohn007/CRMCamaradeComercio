@@ -202,10 +202,21 @@ if (in_array($action, ['new', 'edit'])) {
             $error = 'Salón no encontrado';
             $action = 'list';
         } else {
-            // Obtener imágenes del salón
-            $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
-            $stmt->execute([$id]);
-            $salon_imagenes = $stmt->fetchAll();
+            // Obtener imágenes del salón (if table exists)
+            // The salon_imagenes table is created by 20251124_salon_enhancements.sql migration
+            // Gracefully handle case where migration hasn't been applied yet
+            $salon_imagenes = [];
+            try {
+                $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
+                $stmt->execute([$id]);
+                $salon_imagenes = $stmt->fetchAll();
+            } catch (PDOException $e) {
+                // Only ignore "table doesn't exist" error (42S02), rethrow others
+                if ($e->getCode() !== '42S02') {
+                    throw $e;
+                }
+                // salon_imagenes table doesn't exist - migration not applied, continue with empty array
+            }
         }
     }
 }
@@ -227,10 +238,21 @@ if ($action === 'view' && $id) {
         $error = 'Salón no encontrado';
         $action = 'list';
     } else {
-        // Obtener imágenes del salón
-        $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
-        $stmt->execute([$id]);
-        $salon_imagenes = $stmt->fetchAll();
+        // Obtener imágenes del salón (if table exists)
+        // The salon_imagenes table is created by 20251124_salon_enhancements.sql migration
+        // Gracefully handle case where migration hasn't been applied yet
+        $salon_imagenes = [];
+        try {
+            $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
+            $stmt->execute([$id]);
+            $salon_imagenes = $stmt->fetchAll();
+        } catch (PDOException $e) {
+            // Only ignore "table doesn't exist" error (42S02), rethrow others
+            if ($e->getCode() !== '42S02') {
+                throw $e;
+            }
+            // salon_imagenes table doesn't exist - migration not applied, continue with empty array
+        }
         
         // Obtener reservas del salón
         $stmt = $db->prepare("
@@ -1330,7 +1352,7 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
                             </span>
                         </div>
                         
-                        <?php if ($reserva['metodo_pago'] == 'PAYPAL' && $reserva['paypal_order_id']): ?>
+                        <?php if (($reserva['metodo_pago'] ?? '') == 'PAYPAL' && ($reserva['paypal_order_id'] ?? '')): ?>
                         <div class="flex justify-between">
                             <span class="text-gray-600">ID de Transacción:</span>
                             <span class="font-mono text-xs"><?php echo e($reserva['paypal_order_id']); ?></span>
@@ -1339,24 +1361,24 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
                         
                         <div class="flex justify-between">
                             <span class="text-gray-600">Subtotal:</span>
-                            <span class="font-semibold"><?php echo formatMoney($reserva['monto_total']); ?></span>
+                            <span class="font-semibold"><?php echo formatMoney($reserva['monto_total'] ?? $reserva['monto_pagado'] ?? 0); ?></span>
                         </div>
                         
-                        <?php if ($reserva['descuento_porcentaje'] > 0): ?>
+                        <?php if (($reserva['descuento_porcentaje'] ?? 0) > 0): ?>
                         <div class="flex justify-between text-green-700">
-                            <span>Descuento (<?php echo $reserva['descuento_porcentaje']; ?>%):</span>
-                            <span class="font-semibold">-<?php echo formatMoney($reserva['monto_descuento']); ?></span>
+                            <span>Descuento (<?php echo $reserva['descuento_porcentaje'] ?? 0; ?>%):</span>
+                            <span class="font-semibold">-<?php echo formatMoney($reserva['monto_descuento'] ?? 0); ?></span>
                         </div>
                         <?php endif; ?>
                         
                         <div class="flex justify-between border-t pt-2 mt-2">
                             <span class="font-bold text-gray-800">Total Pagado:</span>
-                            <span class="font-bold text-lg text-green-600"><?php echo formatMoney($reserva['monto_final']); ?></span>
+                            <span class="font-bold text-lg text-green-600"><?php echo formatMoney($reserva['monto_final'] ?? $reserva['monto_pagado'] ?? 0); ?></span>
                         </div>
                         
                         <div class="flex justify-between">
                             <span class="text-gray-600">Fecha de Pago:</span>
-                            <span class="font-semibold"><?php echo formatDate($reserva['fecha_pago'], 'd/m/Y H:i'); ?></span>
+                            <span class="font-semibold"><?php echo formatDate($reserva['fecha_pago'] ?? $reserva['fecha_confirmacion'] ?? null, 'd/m/Y H:i'); ?></span>
                         </div>
                     </div>
                 </div>
@@ -1506,17 +1528,17 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
                     <div class="space-y-3 mb-6">
                         <div class="flex justify-between">
                             <span class="text-gray-600">Subtotal:</span>
-                            <span class="font-semibold"><?php echo formatMoney($reserva['monto_total']); ?></span>
+                            <span class="font-semibold"><?php echo formatMoney($reserva['monto_total'] ?? $reserva['monto_pagado'] ?? 0); ?></span>
                         </div>
                         
-                        <?php if ($reserva['descuento_porcentaje'] > 0): ?>
+                        <?php if (($reserva['descuento_porcentaje'] ?? 0) > 0): ?>
                         <div class="flex justify-between text-green-600">
-                            <span>Descuento (<?php echo $reserva['descuento_porcentaje']; ?>%):</span>
-                            <span class="font-semibold">-<?php echo formatMoney($reserva['monto_descuento']); ?></span>
+                            <span>Descuento (<?php echo $reserva['descuento_porcentaje'] ?? 0; ?>%):</span>
+                            <span class="font-semibold">-<?php echo formatMoney($reserva['monto_descuento'] ?? 0); ?></span>
                         </div>
                         <?php endif; ?>
                         
-                        <?php if ($reserva['es_afiliado'] && $reserva['nivel_membresia']): ?>
+                        <?php if (($reserva['es_afiliado'] ?? false) && ($reserva['nivel_membresia'] ?? '')): ?>
                         <div class="text-sm bg-green-100 text-green-800 px-3 py-2 rounded">
                             <i class="fas fa-badge-check mr-1"></i>
                             Beneficio de membresía: <?php echo e($reserva['nivel_membresia']); ?>
@@ -1526,7 +1548,7 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
                         <div class="border-t-2 border-blue-300 pt-3 mt-3">
                             <div class="flex justify-between items-center">
                                 <span class="text-lg font-semibold text-gray-800">Total:</span>
-                                <span class="text-2xl font-bold text-blue-600"><?php echo formatMoney($reserva['monto_final']); ?></span>
+                                <span class="text-2xl font-bold text-blue-600"><?php echo formatMoney($reserva['monto_final'] ?? $reserva['monto_pagado'] ?? 0); ?></span>
                             </div>
                         </div>
                     </div>
