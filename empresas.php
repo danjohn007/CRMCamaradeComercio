@@ -149,6 +149,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'CREATE_EMPRESA', 'empresas', ?)");
             $stmt->execute([$user['id'], $empresa_id]);
             
+            // Actualizar porcentaje de completitud del perfil
+            actualizarPorcentajeCompletitud($empresa_id);
+            
             $success = 'Empresa registrada exitosamente';
             $action = 'list';
         } else {
@@ -174,6 +177,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // Registrar en auditoría
             $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'UPDATE_EMPRESA', 'empresas', ?)");
             $stmt->execute([$user['id'], $id]);
+            
+            // Actualizar porcentaje de completitud del perfil
+            actualizarPorcentajeCompletitud($id);
             
             // Procesar imágenes nuevas si están presentes
             if (!empty($_FILES['nuevas_imagenes']['name'][0])) {
@@ -915,6 +921,55 @@ if (!$empresa) {
 
             <!-- Información en tabs -->
             <div class="p-6">
+                <!-- Barra de progreso de completitud del perfil -->
+                <?php 
+                $completitud = calcularCompletitudPerfil($empresa);
+                ?>
+                <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+                        <h3 class="text-lg font-bold text-gray-800">
+                            <i class="fas fa-chart-line mr-2 text-blue-600"></i>Progreso de Completitud del Perfil
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl font-bold text-blue-600">
+                                <?php echo number_format($completitud['porcentaje'], 0); ?>%
+                            </span>
+                            <!-- Badge Calidad CANACO -->
+                            <?php if ($completitud['tiene_calidad_canaco']): ?>
+                            <span class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white rounded-full text-sm font-bold shadow-lg">
+                                <i class="fas fa-award mr-2"></i>Calidad CANACO
+                            </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                        <div class="<?php echo $completitud['tiene_calidad_canaco'] ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'; ?> h-6 rounded-full transition-all duration-500"
+                             style="width: <?php echo $completitud['porcentaje']; ?>%">
+                            <span class="flex items-center justify-center h-full text-white text-sm font-semibold">
+                                <?php echo $completitud['campos_completados']; ?> de <?php echo $completitud['campos_totales']; ?> campos
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <?php if ($completitud['porcentaje'] < 100): ?>
+                        <p class="text-gray-700 mt-3 text-sm">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Complete todos los campos para obtener la insignia <strong>Calidad CANACO</strong> y mejorar la visibilidad de la empresa en el directorio público.
+                        </p>
+                    <?php else: ?>
+                        <div class="mt-4 p-4 bg-gradient-to-r from-green-50 to-yellow-50 border-l-4 border-yellow-500 rounded">
+                            <p class="text-green-700 font-semibold">
+                                <i class="fas fa-trophy mr-2"></i>
+                                ¡Perfil 100% completo!
+                            </p>
+                            <p class="text-sm text-gray-700 mt-1">
+                                Esta empresa ha obtenido la insignia <strong>Calidad CANACO</strong>, lo que significa que cumple con los más altos estándares de información y será destacada en el directorio público.
+                            </p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                
                 <!-- Información General -->
                 <div class="mb-8">
                     <h3 class="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b">

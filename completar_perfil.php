@@ -161,6 +161,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $empresa) {
                              VALUES (?, 'UPDATE_PERFIL_EMPRESA', 'empresas', ?)");
         $stmt->execute([$user['id'], $user['empresa_id']]);
         
+        // Actualizar porcentaje de completitud del perfil en base de datos
+        actualizarPorcentajeCompletitud($user['empresa_id']);
+        
         $success = 'Perfil actualizado exitosamente';
         
         // Recargar datos
