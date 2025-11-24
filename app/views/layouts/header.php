@@ -287,6 +287,11 @@ $user = getCurrentUser();
                     <div class="pt-4 mt-4 border-t border-gray-200">
                         <p class="px-4 text-xs font-semibold text-gray-400 uppercase mb-2">Administración</p>
                         
+                        <a href="<?php echo BASE_URL; ?>/salones.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
+                            <i class="fas fa-door-open w-5"></i>
+                            <span>Salones</span>
+                        </a>
+                        
                         <a href="<?php echo BASE_URL; ?>/catalogos/membresias.php" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition menu-link">
                             <i class="fas fa-tags w-5"></i>
                             <span>Membresías</span>
