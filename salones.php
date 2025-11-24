@@ -419,26 +419,96 @@ include __DIR__ . '/app/views/layouts/header.php';
                               placeholder="Ej: Proyector, WiFi, Aire acondicionado, Pizarra..."><?php echo e($salon['caracteristicas'] ?? ''); ?></textarea>
                 </div>
 
-                <!-- Precios -->
+                <!-- Precios (mantener por compatibilidad) -->
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Precio por Hora</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Hora (Base)</label>
                     <input type="number" name="precio_hora" step="0.01" min="0"
                            value="<?php echo e($salon['precio_hora'] ?? '0'); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
 
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">Precio por Día</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Día (Base)</label>
                     <input type="number" name="precio_dia" step="0.01" min="0"
                            value="<?php echo e($salon['precio_dia'] ?? '0'); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
 
                 <div class="md:col-span-2">
-                    <label class="block text-gray-700 font-semibold mb-2">Precio por Evento Completo</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Evento Completo (Base)</label>
                     <input type="number" name="precio_evento" step="0.01" min="0"
                            value="<?php echo e($salon['precio_evento'] ?? '0'); ?>"
                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Precios Diferenciados -->
+                <div class="md:col-span-2 mt-6">
+                    <h3 class="text-lg font-bold text-gray-700 mb-4 border-b pb-2">
+                        <i class="fas fa-tags mr-2"></i>Precios Diferenciados (Afiliados vs No Afiliados)
+                    </h3>
+                </div>
+
+                <!-- Precios para Afiliados -->
+                <div class="md:col-span-2">
+                    <h4 class="text-md font-semibold text-green-700 mb-3">
+                        <i class="fas fa-user-check mr-2"></i>Tarifas para Afiliados
+                    </h4>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Hora - Afiliados</label>
+                    <input type="number" name="precio_hora_afiliado" step="0.01" min="0"
+                           value="<?php echo e($salon['precio_hora_afiliado'] ?? '0'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Día - Afiliados</label>
+                    <input type="number" name="precio_dia_afiliado" step="0.01" min="0"
+                           value="<?php echo e($salon['precio_dia_afiliado'] ?? '0'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Evento - Afiliados</label>
+                    <input type="number" name="precio_evento_afiliado" step="0.01" min="0"
+                           value="<?php echo e($salon['precio_evento_afiliado'] ?? '0'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                </div>
+
+                <!-- Precios para No Afiliados -->
+                <div class="md:col-span-2 mt-4">
+                    <h4 class="text-md font-semibold text-orange-700 mb-3">
+                        <i class="fas fa-user mr-2"></i>Tarifas para No Afiliados
+                    </h4>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Hora - No Afiliados</label>
+                    <input type="number" name="precio_hora_no_afiliado" step="0.01" min="0"
+                           value="<?php echo e($salon['precio_hora_no_afiliado'] ?? '0'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Día - No Afiliados</label>
+                    <input type="number" name="precio_dia_no_afiliado" step="0.01" min="0"
+                           value="<?php echo e($salon['precio_dia_no_afiliado'] ?? '0'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 font-semibold mb-2">Precio por Evento - No Afiliados</label>
+                    <input type="number" name="precio_evento_no_afiliado" step="0.01" min="0"
+                           value="<?php echo e($salon['precio_evento_no_afiliado'] ?? '0'); ?>"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500">
+                </div>
+
+                <div class="md:col-span-2 mt-2">
+                    <p class="text-sm text-gray-600 italic">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Los afiliados también recibirán un descuento adicional según su nivel de membresía.
+                    </p>
                 </div>
 
                 <!-- Formas de Pago -->
@@ -478,6 +548,158 @@ include __DIR__ . '/app/views/layouts/header.php';
                 </button>
             </div>
         </form>
+
+        <?php if ($action === 'edit' && isset($salon)): ?>
+        <!-- Galería de Imágenes -->
+        <div class="bg-white rounded-lg shadow-md p-8 mt-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-images mr-2"></i>Galería de Imágenes
+            </h2>
+
+            <!-- Subir nueva imagen -->
+            <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 class="font-semibold text-gray-700 mb-3">Subir Nueva Imagen</h3>
+                <form id="form-upload-imagen" class="flex gap-4 items-end">
+                    <input type="hidden" name="salon_id" value="<?php echo $salon['id']; ?>">
+                    <div class="flex-1">
+                        <label class="block text-sm text-gray-600 mb-1">Seleccionar Imagen</label>
+                        <input type="file" name="imagen" accept="image/*" required
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm text-gray-600 mb-1">Descripción (opcional)</label>
+                        <input type="text" name="descripcion" placeholder="Descripción de la imagen"
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-upload mr-2"></i>Subir
+                    </button>
+                </form>
+            </div>
+
+            <!-- Listado de imágenes -->
+            <div id="galeria-imagenes" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <?php if (isset($salon_imagenes) && count($salon_imagenes) > 0): ?>
+                    <?php foreach ($salon_imagenes as $imagen): ?>
+                    <div class="relative group" data-imagen-id="<?php echo $imagen['id']; ?>">
+                        <img src="<?php echo BASE_URL . e($imagen['ruta_imagen']); ?>" 
+                             alt="<?php echo e($imagen['descripcion']); ?>"
+                             class="w-full h-48 object-cover rounded-lg shadow-md">
+                        
+                        <?php if ($imagen['es_principal']): ?>
+                        <span class="absolute top-2 left-2 px-3 py-1 bg-green-600 text-white text-xs rounded-full">
+                            <i class="fas fa-star mr-1"></i>Principal
+                        </span>
+                        <?php endif; ?>
+                        
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 rounded-b-lg opacity-0 group-hover:opacity-100 transition">
+                            <p class="text-white text-sm truncate"><?php echo e($imagen['descripcion']); ?></p>
+                        </div>
+                        
+                        <div class="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                            <?php if (!$imagen['es_principal']): ?>
+                            <button onclick="setPrincipal(<?php echo $imagen['id']; ?>)" 
+                                    class="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                                    title="Marcar como principal">
+                                <i class="fas fa-star"></i>
+                            </button>
+                            <?php endif; ?>
+                            <button onclick="deleteImagen(<?php echo $imagen['id']; ?>)" 
+                                    class="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                                    title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="col-span-3 text-center py-8 text-gray-500">
+                        <i class="fas fa-images text-5xl mb-3"></i>
+                        <p>No hay imágenes. Sube la primera imagen para este salón.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <script>
+        // Upload imagen
+        document.getElementById('form-upload-imagen').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch('<?php echo BASE_URL; ?>/api/salon_imagenes.php?action=upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Imagen subida exitosamente');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error al subir la imagen: ' + error.message);
+            }
+        });
+
+        // Marcar como principal
+        async function setPrincipal(imagenId) {
+            if (!confirm('¿Desea marcar esta imagen como principal?')) return;
+            
+            try {
+                const formData = new FormData();
+                formData.append('imagen_id', imagenId);
+                
+                const response = await fetch('<?php echo BASE_URL; ?>/api/salon_imagenes.php?action=set_principal', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Imagen principal actualizada');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Eliminar imagen
+        async function deleteImagen(imagenId) {
+            if (!confirm('¿Está seguro de eliminar esta imagen?')) return;
+            
+            try {
+                const formData = new FormData();
+                formData.append('imagen_id', imagenId);
+                
+                const response = await fetch('<?php echo BASE_URL; ?>/api/salon_imagenes.php?action=delete', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Imagen eliminada');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        </script>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -509,6 +731,37 @@ include __DIR__ . '/app/views/layouts/header.php';
         <?php endif; ?>
 
         <div class="bg-white rounded-lg shadow-md p-6">
+            <!-- Galería de Imágenes -->
+            <?php if (isset($salon_imagenes) && count($salon_imagenes) > 0): ?>
+            <div class="mb-8">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-images mr-2"></i>Galería de Imágenes
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <?php foreach ($salon_imagenes as $imagen): ?>
+                    <div class="relative group">
+                        <img src="<?php echo BASE_URL . e($imagen['ruta_imagen']); ?>" 
+                             alt="<?php echo e($imagen['descripcion']); ?>"
+                             class="w-full h-48 object-cover rounded-lg shadow-md cursor-pointer hover:opacity-90 transition"
+                             onclick="openImageModal('<?php echo BASE_URL . e($imagen['ruta_imagen']); ?>')">
+                        
+                        <?php if ($imagen['es_principal']): ?>
+                        <span class="absolute top-2 left-2 px-3 py-1 bg-green-600 text-white text-xs rounded-full">
+                            <i class="fas fa-star mr-1"></i>Principal
+                        </span>
+                        <?php endif; ?>
+                        
+                        <?php if ($imagen['descripcion']): ?>
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 rounded-b-lg opacity-0 group-hover:opacity-100 transition">
+                            <p class="text-white text-sm"><?php echo e($imagen['descripcion']); ?></p>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Información básica -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div>
@@ -541,21 +794,53 @@ include __DIR__ . '/app/views/layouts/header.php';
             </div>
             <?php endif; ?>
 
-            <!-- Precios -->
+            <!-- Precios Diferenciados -->
             <div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Tarifas</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-blue-50 rounded-lg p-4">
-                        <p class="text-sm text-gray-600">Por Hora</p>
-                        <p class="text-2xl font-bold text-blue-600"><?php echo formatMoney($salon['precio_hora']); ?></p>
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Tarifas</h3>
+                
+                <!-- Tarifas para Afiliados -->
+                <div class="mb-6">
+                    <h4 class="text-md font-semibold text-green-700 mb-3">
+                        <i class="fas fa-user-check mr-2"></i>Tarifas para Afiliados
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                            <p class="text-sm text-gray-600">Por Hora</p>
+                            <p class="text-2xl font-bold text-green-600"><?php echo formatMoney($salon['precio_hora_afiliado'] ?? $salon['precio_hora']); ?></p>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                            <p class="text-sm text-gray-600">Por Día</p>
+                            <p class="text-2xl font-bold text-green-600"><?php echo formatMoney($salon['precio_dia_afiliado'] ?? $salon['precio_dia']); ?></p>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                            <p class="text-sm text-gray-600">Evento Completo</p>
+                            <p class="text-2xl font-bold text-green-600"><?php echo formatMoney($salon['precio_evento_afiliado'] ?? $salon['precio_evento']); ?></p>
+                        </div>
                     </div>
-                    <div class="bg-green-50 rounded-lg p-4">
-                        <p class="text-sm text-gray-600">Por Día</p>
-                        <p class="text-2xl font-bold text-green-600"><?php echo formatMoney($salon['precio_dia']); ?></p>
-                    </div>
-                    <div class="bg-purple-50 rounded-lg p-4">
-                        <p class="text-sm text-gray-600">Evento Completo</p>
-                        <p class="text-2xl font-bold text-purple-600"><?php echo formatMoney($salon['precio_evento']); ?></p>
+                    <p class="text-sm text-gray-600 mt-2 italic">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Descuento adicional según nivel de membresía
+                    </p>
+                </div>
+                
+                <!-- Tarifas para No Afiliados -->
+                <div>
+                    <h4 class="text-md font-semibold text-orange-700 mb-3">
+                        <i class="fas fa-user mr-2"></i>Tarifas para No Afiliados
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
+                            <p class="text-sm text-gray-600">Por Hora</p>
+                            <p class="text-2xl font-bold text-orange-600"><?php echo formatMoney($salon['precio_hora_no_afiliado'] ?? $salon['precio_hora']); ?></p>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
+                            <p class="text-sm text-gray-600">Por Día</p>
+                            <p class="text-2xl font-bold text-orange-600"><?php echo formatMoney($salon['precio_dia_no_afiliado'] ?? $salon['precio_dia']); ?></p>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
+                            <p class="text-sm text-gray-600">Evento Completo</p>
+                            <p class="text-2xl font-bold text-orange-600"><?php echo formatMoney($salon['precio_evento_no_afiliado'] ?? $salon['precio_evento']); ?></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -664,5 +949,30 @@ include __DIR__ . '/app/views/layouts/header.php';
 
 
 <?php endif; ?>
+
+<!-- Modal para ver imagen en grande -->
+<div id="imageModal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center p-4" onclick="closeImageModal()">
+    <div class="max-w-4xl max-h-full">
+        <img id="modalImage" src="" alt="" class="max-w-full max-h-screen object-contain rounded-lg shadow-2xl">
+    </div>
+</div>
+
+<script>
+function openImageModal(imageSrc) {
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModal').classList.remove('hidden');
+}
+
+function closeImageModal() {
+    document.getElementById('imageModal').classList.add('hidden');
+}
+
+// Close modal on ESC key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeImageModal();
+    }
+});
+</script>
 
 <?php include __DIR__ . '/app/views/layouts/footer.php'; ?>
