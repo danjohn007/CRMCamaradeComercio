@@ -26,6 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'precio_hora' => floatval($_POST['precio_hora'] ?? 0),
         'precio_dia' => floatval($_POST['precio_dia'] ?? 0),
         'precio_evento' => floatval($_POST['precio_evento'] ?? 0),
+        'precio_hora_afiliado' => floatval($_POST['precio_hora_afiliado'] ?? 0),
+        'precio_dia_afiliado' => floatval($_POST['precio_dia_afiliado'] ?? 0),
+        'precio_evento_afiliado' => floatval($_POST['precio_evento_afiliado'] ?? 0),
+        'precio_hora_no_afiliado' => floatval($_POST['precio_hora_no_afiliado'] ?? 0),
+        'precio_dia_no_afiliado' => floatval($_POST['precio_dia_no_afiliado'] ?? 0),
+        'precio_evento_no_afiliado' => floatval($_POST['precio_evento_no_afiliado'] ?? 0),
         'formas_pago' => sanitize($_POST['formas_pago'] ?? ''),
         'procedimiento_contratacion' => sanitize($_POST['procedimiento_contratacion'] ?? ''),
         'activo' => isset($_POST['activo']) ? 1 : 0,
@@ -34,13 +40,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if ($action === 'new') {
             $sql = "INSERT INTO salones (nombre, tipo, descripcion, capacidad, caracteristicas, 
-                    precio_hora, precio_dia, precio_evento, formas_pago, procedimiento_contratacion, activo) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    precio_hora, precio_dia, precio_evento, 
+                    precio_hora_afiliado, precio_dia_afiliado, precio_evento_afiliado,
+                    precio_hora_no_afiliado, precio_dia_no_afiliado, precio_evento_no_afiliado,
+                    formas_pago, procedimiento_contratacion, activo) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 $data['nombre'], $data['tipo'], $data['descripcion'], $data['capacidad'],
                 $data['caracteristicas'], $data['precio_hora'], $data['precio_dia'], $data['precio_evento'],
+                $data['precio_hora_afiliado'], $data['precio_dia_afiliado'], $data['precio_evento_afiliado'],
+                $data['precio_hora_no_afiliado'], $data['precio_dia_no_afiliado'], $data['precio_evento_no_afiliado'],
                 $data['formas_pago'], $data['procedimiento_contratacion'], $data['activo']
             ]);
             
@@ -55,7 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         } else {
             // Editar salón existente
             $sql = "UPDATE salones SET nombre = ?, tipo = ?, descripcion = ?, capacidad = ?, 
-                    caracteristicas = ?, precio_hora = ?, precio_dia = ?, precio_evento = ?, 
+                    caracteristicas = ?, precio_hora = ?, precio_dia = ?, precio_evento = ?,
+                    precio_hora_afiliado = ?, precio_dia_afiliado = ?, precio_evento_afiliado = ?,
+                    precio_hora_no_afiliado = ?, precio_dia_no_afiliado = ?, precio_evento_no_afiliado = ?,
                     formas_pago = ?, procedimiento_contratacion = ?, activo = ?
                     WHERE id = ?";
             
@@ -63,6 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $stmt->execute([
                 $data['nombre'], $data['tipo'], $data['descripcion'], $data['capacidad'],
                 $data['caracteristicas'], $data['precio_hora'], $data['precio_dia'], $data['precio_evento'],
+                $data['precio_hora_afiliado'], $data['precio_dia_afiliado'], $data['precio_evento_afiliado'],
+                $data['precio_hora_no_afiliado'], $data['precio_dia_no_afiliado'], $data['precio_evento_no_afiliado'],
                 $data['formas_pago'], $data['procedimiento_contratacion'], $data['activo'], $id
             ]);
             
@@ -186,6 +201,11 @@ if (in_array($action, ['new', 'edit'])) {
         if (!$salon) {
             $error = 'Salón no encontrado';
             $action = 'list';
+        } else {
+            // Obtener imágenes del salón
+            $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
+            $stmt->execute([$id]);
+            $salon_imagenes = $stmt->fetchAll();
         }
     }
 }
@@ -207,6 +227,11 @@ if ($action === 'view' && $id) {
         $error = 'Salón no encontrado';
         $action = 'list';
     } else {
+        // Obtener imágenes del salón
+        $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
+        $stmt->execute([$id]);
+        $salon_imagenes = $stmt->fetchAll();
+        
         // Obtener reservas del salón
         $stmt = $db->prepare("
             SELECT sr.*, e.razon_social, u.nombre as usuario_nombre
