@@ -160,11 +160,30 @@ include __DIR__ . '/../app/views/layouts/header.php';
     
     function copiarEnlace() {
         const input = document.getElementById('enlacePublicoInput');
+        const texto = input.value;
+        
+        // Intentar usar Clipboard API moderna
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(texto).then(() => {
+                mostrarFeedbackCopia(event.target);
+            }).catch(() => {
+                // Fallback a método antiguo
+                copiarFallback(input);
+            });
+        } else {
+            // Fallback para navegadores antiguos
+            copiarFallback(input);
+        }
+    }
+    
+    function copiarFallback(input) {
         input.select();
         document.execCommand('copy');
-        
-        // Mostrar feedback
-        const btn = event.target.closest('button');
+        mostrarFeedbackCopia(event.target);
+    }
+    
+    function mostrarFeedbackCopia(elemento) {
+        const btn = elemento.closest('button');
         const originalHTML = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-check mr-2"></i>¡Copiado!';
         btn.classList.add('bg-green-600');
@@ -180,16 +199,32 @@ include __DIR__ . '/../app/views/layouts/header.php';
     function copiarEnlaceEspecifico(membresiaId) {
         const enlace = '<?php echo BASE_URL; ?>/afiliacion_publica.php?membresia=' + membresiaId;
         
-        // Crear input temporal para copiar
+        // Intentar usar Clipboard API moderna
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(enlace).then(() => {
+                mostrarFeedbackCopiaEspecifico(event.target);
+            }).catch(() => {
+                // Fallback a método antiguo
+                copiarEnlaceEspecificoFallback(enlace);
+            });
+        } else {
+            // Fallback para navegadores antiguos
+            copiarEnlaceEspecificoFallback(enlace);
+        }
+    }
+    
+    function copiarEnlaceEspecificoFallback(enlace) {
         const input = document.createElement('input');
         input.value = enlace;
         document.body.appendChild(input);
         input.select();
         document.execCommand('copy');
         document.body.removeChild(input);
-        
-        // Mostrar feedback
-        const btn = event.target.closest('button');
+        mostrarFeedbackCopiaEspecifico(event.target);
+    }
+    
+    function mostrarFeedbackCopiaEspecifico(elemento) {
+        const btn = elemento.closest('button');
         const originalHTML = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-check"></i>';
         btn.classList.add('bg-green-600');

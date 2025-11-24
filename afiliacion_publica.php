@@ -86,8 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $paso === '1') {
             throw new Exception('Membresía no válida');
         }
         
-        // Generar contraseña temporal
-        $password_temporal = bin2hex(random_bytes(8));
+        // Generar contraseña temporal (12 caracteres alfanuméricos)
+        $password_temporal = bin2hex(random_bytes(12));
         $password_hash = password_hash($password_temporal, PASSWORD_DEFAULT);
         
         // Calcular fecha de renovación (fecha de vencimiento)

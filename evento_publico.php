@@ -18,8 +18,8 @@ $search_performed = false;
 
 // Generar captcha
 if (!isset($_SESSION['captcha_evento_num1'])) {
-    $_SESSION['captcha_evento_num1'] = rand(1, 10);
-    $_SESSION['captcha_evento_num2'] = rand(1, 10);
+    $_SESSION['captcha_evento_num1'] = random_int(1, 10);
+    $_SESSION['captcha_evento_num2'] = random_int(1, 10);
 }
 
 // Obtener configuración
@@ -366,8 +366,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         // Regenerar captcha
-        $_SESSION['captcha_evento_num1'] = rand(1, 10);
-        $_SESSION['captcha_evento_num2'] = rand(1, 10);
+        $_SESSION['captcha_evento_num1'] = random_int(1, 10);
+        $_SESSION['captcha_evento_num2'] = random_int(1, 10);
         
         // Mensaje de éxito según si requiere pago o no
         if ($requiere_pago) {
