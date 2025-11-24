@@ -404,12 +404,17 @@ function actualizarEstadoEmpresasPorVencimiento($empresa_id = null) {
  * @return float The calculated payment amount
  */
 function calcularMontoPagoEvento($inscripcion, $costo_evento = null) {
+    // Validate input - return 0 if inscripcion is not an array
+    if (!is_array($inscripcion)) {
+        return 0.0;
+    }
+    
     // First try to use the stored monto_pagado
     $monto = floatval($inscripcion['monto_pagado'] ?? 0);
     
     // If monto_pagado is not set or is 0, calculate from event cost × tickets
     if ($monto <= 0) {
-        $boletos = intval($inscripcion['boletos_solicitados'] ?? 1);
+        $boletos = max(1, intval($inscripcion['boletos_solicitados'] ?? 1));
         $costo = $costo_evento ?? floatval($inscripcion['costo'] ?? 0);
         $monto = $costo * $boletos;
     }
