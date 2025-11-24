@@ -133,8 +133,18 @@ if (empty($codigo)) {
                     <p class="text-sm text-gray-700 mb-2">
                         <strong>Boletos:</strong> <?php echo $inscripcion['boletos_solicitados'] ?? 1; ?>
                     </p>
+                    <?php 
+                        // Calculate amount to pay - use monto_pagado if set, otherwise calculate from event cost and tickets
+                        $monto_a_pagar = floatval($inscripcion['monto_pagado'] ?? 0);
+                        if ($monto_a_pagar <= 0) {
+                            // Recalculate based on event cost and tickets if monto_pagado is not set
+                            $boletos_solicitados = intval($inscripcion['boletos_solicitados'] ?? 1);
+                            $costo_evento = floatval($inscripcion['costo'] ?? 0);
+                            $monto_a_pagar = $costo_evento * $boletos_solicitados;
+                        }
+                    ?>
                     <p class="text-sm text-gray-700 mb-2">
-                        <strong>Monto a pagar:</strong> $<?php echo number_format($inscripcion['monto_pagado'], 2); ?> MXN
+                        <strong>Monto a pagar:</strong> $<?php echo number_format($monto_a_pagar, 2); ?> MXN
                     </p>
                 </div>
                 
