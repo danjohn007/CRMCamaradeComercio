@@ -77,10 +77,173 @@ include __DIR__ . '/../app/views/layouts/header.php';
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold text-gray-800">Catálogo de Membresías</h1>
-        <a href="?action=new" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-            <i class="fas fa-plus mr-2"></i>Nueva Membresía
-        </a>
+        <div class="flex gap-3">
+            <a href="?action=new" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-plus mr-2"></i>Nueva Membresía
+            </a>
+            <button onclick="mostrarEnlacePublico()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
+                <i class="fas fa-link mr-2"></i>Enlace Público
+            </button>
+        </div>
     </div>
+    
+    <!-- Modal de Enlace Público -->
+    <div id="modalEnlacePublico" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-link text-green-600 mr-2"></i>
+                    Enlace de Afiliación Pública
+                </h3>
+                <button onclick="cerrarEnlacePublico()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <p class="text-gray-600 mb-4">
+                Comparte este enlace para que nuevas empresas puedan registrarse y pagar su membresía directamente, 
+                sin necesidad de iniciar sesión.
+            </p>
+            
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="flex items-center gap-3">
+                    <input type="text" 
+                           id="enlacePublicoInput" 
+                           readonly
+                           value="<?php echo BASE_URL; ?>/afiliacion_publica.php"
+                           class="flex-1 px-4 py-2 border rounded-lg bg-white">
+                    <button onclick="copiarEnlace()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">
+                        <i class="fas fa-copy mr-2"></i>Copiar
+                    </button>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <h4 class="font-semibold text-gray-800">Enlaces por Membresía:</h4>
+                <?php foreach ($membresias as $memb): ?>
+                    <?php if ($memb['activo']): ?>
+                    <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800"><?php echo e($memb['nombre']); ?></p>
+                            <input type="text" 
+                                   readonly
+                                   value="<?php echo BASE_URL; ?>/afiliacion_publica.php?membresia=<?php echo $memb['id']; ?>"
+                                   class="w-full px-3 py-1 text-sm border rounded bg-white mt-1">
+                        </div>
+                        <button onclick="copiarEnlaceEspecifico(<?php echo $memb['id']; ?>)" 
+                                class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t">
+                <p class="text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    El enlace general muestra todas las membresías activas. Los enlaces específicos llevan directo al formulario de esa membresía.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function mostrarEnlacePublico() {
+        document.getElementById('modalEnlacePublico').classList.remove('hidden');
+    }
+    
+    function cerrarEnlacePublico() {
+        document.getElementById('modalEnlacePublico').classList.add('hidden');
+    }
+    
+    function copiarEnlace() {
+        const input = document.getElementById('enlacePublicoInput');
+        const texto = input.value;
+        
+        // Intentar usar Clipboard API moderna
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(texto).then(() => {
+                mostrarFeedbackCopia(event.target);
+            }).catch(() => {
+                // Fallback a método antiguo
+                copiarFallback(input);
+            });
+        } else {
+            // Fallback para navegadores antiguos
+            copiarFallback(input);
+        }
+    }
+    
+    function copiarFallback(input) {
+        input.select();
+        document.execCommand('copy');
+        mostrarFeedbackCopia(event.target);
+    }
+    
+    function mostrarFeedbackCopia(elemento) {
+        const btn = elemento.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i>¡Copiado!';
+        btn.classList.add('bg-green-600');
+        btn.classList.remove('bg-blue-600');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('bg-green-600');
+            btn.classList.add('bg-blue-600');
+        }, 2000);
+    }
+    
+    function copiarEnlaceEspecifico(membresiaId) {
+        const enlace = '<?php echo BASE_URL; ?>/afiliacion_publica.php?membresia=' + membresiaId;
+        
+        // Intentar usar Clipboard API moderna
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(enlace).then(() => {
+                mostrarFeedbackCopiaEspecifico(event.target);
+            }).catch(() => {
+                // Fallback a método antiguo
+                copiarEnlaceEspecificoFallback(enlace);
+            });
+        } else {
+            // Fallback para navegadores antiguos
+            copiarEnlaceEspecificoFallback(enlace);
+        }
+    }
+    
+    function copiarEnlaceEspecificoFallback(enlace) {
+        const input = document.createElement('input');
+        input.value = enlace;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        mostrarFeedbackCopiaEspecifico(event.target);
+    }
+    
+    function mostrarFeedbackCopiaEspecifico(elemento) {
+        const btn = elemento.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.add('bg-green-600');
+        btn.classList.remove('bg-blue-600');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('bg-green-600');
+            btn.classList.add('bg-blue-600');
+        }, 2000);
+    }
+    
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modalEnlacePublico')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            cerrarEnlacePublico();
+        }
+    });
+    </script>
 
     <?php if ($success): ?>
         <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6">

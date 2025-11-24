@@ -1235,8 +1235,6 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
 
 
 
-<?php endif; ?>
-
 <?php elseif ($action === 'confirmacion' && isset($reserva)): ?>
 <!-- Página de Confirmación de Reserva -->
 <div class="container mx-auto px-4 py-8">
