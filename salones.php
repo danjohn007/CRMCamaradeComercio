@@ -246,6 +246,31 @@ if ($action === 'view' && $id) {
     }
 }
 
+// Ver página de confirmación
+if ($action === 'confirmacion') {
+    $reserva_id = intval($_GET['reserva_id'] ?? 0);
+    
+    if (!$reserva_id) {
+        $error = 'ID de reserva requerido';
+        $action = 'list';
+    } else {
+        // Obtener información de la reserva
+        $stmt = $db->prepare("
+            SELECT sr.*, s.nombre as salon_nombre, s.tipo as salon_tipo
+            FROM salon_reservas sr
+            INNER JOIN salones s ON sr.salon_id = s.id
+            WHERE sr.id = ? AND sr.usuario_id = ?
+        ");
+        $stmt->execute([$reserva_id, $user['id']]);
+        $reserva = $stmt->fetch();
+        
+        if (!$reserva) {
+            $error = 'Reserva no encontrada o no tiene permisos para verla';
+            $action = 'list';
+        }
+    }
+}
+
 // Ver página de pago
 if ($action === 'pago') {
     $reserva_id = intval($_GET['reserva_id'] ?? 0);
@@ -1211,6 +1236,188 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
 
 
 <?php endif; ?>
+
+<?php elseif ($action === 'confirmacion' && isset($reserva)): ?>
+<!-- Página de Confirmación de Reserva -->
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-3xl mx-auto">
+        <!-- Mensaje de Éxito -->
+        <div class="bg-green-50 border-2 border-green-500 rounded-lg p-8 mb-6 text-center">
+            <i class="fas fa-check-circle text-6xl text-green-600 mb-4"></i>
+            <h1 class="text-3xl font-bold text-green-800 mb-2">¡Reserva Confirmada!</h1>
+            <p class="text-gray-700">Su reserva ha sido procesada exitosamente.</p>
+        </div>
+
+        <!-- Comprobante de Reserva -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
+                <i class="fas fa-file-invoice mr-2"></i>Comprobante de Reserva
+            </h2>
+
+            <div class="space-y-4">
+                <!-- Número de Reserva -->
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-600 mb-1">Número de Reserva</p>
+                    <p class="text-2xl font-bold text-blue-600">#<?php echo str_pad($reserva['id'], 6, '0', STR_PAD_LEFT); ?></p>
+                </div>
+
+                <!-- Información del Salón -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600 mb-1">Salón</p>
+                        <p class="font-semibold text-gray-800"><?php echo e($reserva['salon_nombre']); ?></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600 mb-1">Tipo</p>
+                        <p class="font-semibold text-gray-800"><?php echo e($reserva['salon_tipo']); ?></p>
+                    </div>
+                </div>
+
+                <!-- Fechas -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600 mb-1">Fecha y Hora Inicio</p>
+                        <p class="font-semibold text-gray-800"><?php echo formatDate($reserva['fecha_inicio'], 'd/m/Y H:i'); ?></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600 mb-1">Fecha y Hora Fin</p>
+                        <p class="font-semibold text-gray-800"><?php echo formatDate($reserva['fecha_fin'], 'd/m/Y H:i'); ?></p>
+                    </div>
+                </div>
+
+                <!-- Propósito -->
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Propósito</p>
+                    <p class="font-semibold text-gray-800"><?php echo e($reserva['proposito']); ?></p>
+                </div>
+
+                <!-- Información de Contacto -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">Información de Contacto</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                            <p class="text-gray-600">Nombre:</p>
+                            <p class="font-semibold"><?php echo e($reserva['contacto_nombre']); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">Email:</p>
+                            <p class="font-semibold"><?php echo e($reserva['contacto_email']); ?></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">Teléfono:</p>
+                            <p class="font-semibold"><?php echo e($reserva['contacto_telefono']); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalles del Pago -->
+                <div class="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                    <p class="text-sm font-semibold text-green-800 mb-3">Detalles del Pago</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Método de Pago:</span>
+                            <span class="font-semibold text-gray-800">
+                                <?php 
+                                switch($reserva['metodo_pago']) {
+                                    case 'PAYPAL':
+                                        echo '<i class="fab fa-paypal text-blue-600 mr-1"></i>PayPal';
+                                        break;
+                                    case 'COMPROBANTE':
+                                        echo '<i class="fas fa-file-upload text-green-600 mr-1"></i>Comprobante';
+                                        break;
+                                    default:
+                                        echo $reserva['metodo_pago'] ?? 'N/A';
+                                }
+                                ?>
+                            </span>
+                        </div>
+                        
+                        <?php if ($reserva['metodo_pago'] == 'PAYPAL' && $reserva['paypal_order_id']): ?>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">ID de Transacción:</span>
+                            <span class="font-mono text-xs"><?php echo e($reserva['paypal_order_id']); ?></span>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Subtotal:</span>
+                            <span class="font-semibold"><?php echo formatMoney($reserva['monto_total']); ?></span>
+                        </div>
+                        
+                        <?php if ($reserva['descuento_porcentaje'] > 0): ?>
+                        <div class="flex justify-between text-green-700">
+                            <span>Descuento (<?php echo $reserva['descuento_porcentaje']; ?>%):</span>
+                            <span class="font-semibold">-<?php echo formatMoney($reserva['monto_descuento']); ?></span>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div class="flex justify-between border-t pt-2 mt-2">
+                            <span class="font-bold text-gray-800">Total Pagado:</span>
+                            <span class="font-bold text-lg text-green-600"><?php echo formatMoney($reserva['monto_final']); ?></span>
+                        </div>
+                        
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Fecha de Pago:</span>
+                            <span class="font-semibold"><?php echo formatDate($reserva['fecha_pago'], 'd/m/Y H:i'); ?></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estado -->
+                <div class="text-center">
+                    <span class="inline-block px-6 py-2 text-lg rounded-full font-semibold
+                        <?php 
+                        echo $reserva['estado'] == 'CONFIRMADA' ? 'bg-green-100 text-green-800' : 
+                             ($reserva['estado'] == 'CANCELADA' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'); 
+                        ?>">
+                        <i class="fas fa-check-circle mr-2"></i><?php echo e($reserva['estado']); ?>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información Adicional -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-6 mb-6">
+            <h3 class="font-semibold text-blue-800 mb-2">
+                <i class="fas fa-envelope mr-2"></i>Comprobante Enviado
+            </h3>
+            <p class="text-sm text-gray-700">
+                Se ha enviado un comprobante de su reserva a <strong><?php echo e($reserva['contacto_email']); ?></strong>. 
+                Por favor, revise su correo electrónico (incluyendo la carpeta de spam).
+            </p>
+        </div>
+
+        <!-- Notas Adicionales -->
+        <?php if ($reserva['notas']): ?>
+        <div class="bg-gray-50 rounded-lg p-6 mb-6">
+            <h3 class="font-semibold text-gray-800 mb-2">
+                <i class="fas fa-sticky-note mr-2"></i>Notas Adicionales
+            </h3>
+            <p class="text-gray-700"><?php echo nl2br(e($reserva['notas'])); ?></p>
+        </div>
+        <?php endif; ?>
+
+        <!-- Botones de Acción -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="?action=calendario&id=<?php echo $reserva['salon_id']; ?>" 
+               class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-center">
+                <i class="fas fa-calendar mr-2"></i>Ver Calendario
+            </a>
+            <a href="?action=view&id=<?php echo $reserva['salon_id']; ?>" 
+               class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center">
+                <i class="fas fa-building mr-2"></i>Ver Salón
+            </a>
+            <a href="?action=list" 
+               class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-center">
+                <i class="fas fa-list mr-2"></i>Ver Todos los Salones
+            </a>
+            <button onclick="window.print()" 
+                    class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                <i class="fas fa-print mr-2"></i>Imprimir Comprobante
+            </button>
+        </div>
+    </div>
+</div>
 
 <?php elseif ($action === 'pago' && isset($reserva)): ?>
 <!-- Página de Pago de Reserva -->
