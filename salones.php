@@ -78,17 +78,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     }
 }
 
-// Eliminar salón
+// Eliminar salón (soft delete - mark as inactive instead of deleting)
 if ($action === 'delete' && $id) {
     try {
-        $stmt = $db->prepare("DELETE FROM salones WHERE id = ?");
+        // Check for existing reservations
+        $stmt = $db->prepare("SELECT COUNT(*) as total FROM salon_reservas WHERE salon_id = ? AND estado != 'CANCELADA'");
         $stmt->execute([$id]);
+        $result = $stmt->fetch();
         
-        // Registrar en auditoría
-        $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'DELETE_SALON', 'salones', ?)");
-        $stmt->execute([$user['id'], $id]);
-        
-        $success = 'Salón eliminado exitosamente';
+        if ($result['total'] > 0) {
+            $error = 'No se puede eliminar el salón porque tiene reservas activas. Cancele las reservas primero.';
+        } else {
+            // Soft delete - mark as inactive
+            $stmt = $db->prepare("UPDATE salones SET activo = 0 WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // Registrar en auditoría
+            $stmt = $db->prepare("INSERT INTO auditoria (usuario_id, accion, tabla_afectada, registro_id) VALUES (?, 'DELETE_SALON', 'salones', ?)");
+            $stmt->execute([$user['id'], $id]);
+            
+            $success = 'Salón desactivado exitosamente';
+        }
         $action = 'list';
     } catch (Exception $e) {
         $error = 'Error al eliminar el salón: ' . $e->getMessage();
@@ -626,10 +636,7 @@ include __DIR__ . '/app/views/layouts/header.php';
     </div>
 </div>
 
-<script>
-// Aquí se podría integrar una librería de calendario como FullCalendar
-// Por ahora solo mostramos las reservas en lista
-</script>
+
 
 <?php endif; ?>
 

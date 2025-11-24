@@ -10,6 +10,8 @@ ADD COLUMN IF NOT EXISTS perfil_completado_porcentaje DECIMAL(5,2) DEFAULT 0 COM
 
 -- Update existing records with their current completion percentage
 -- This will calculate and set the initial percentage for all existing companies
+-- NOTE: For large databases (>10,000 records), consider running this in batches
+-- or during off-peak hours to avoid performance issues
 UPDATE empresas e
 SET perfil_completado_porcentaje = (
     SELECT ROUND(
