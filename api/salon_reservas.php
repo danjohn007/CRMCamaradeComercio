@@ -37,12 +37,13 @@ try {
             }
             
             // Determinar si es afiliado y obtener descuento de membresía
+            // The descuento_salones column is added by 20251124_salon_enhancements.sql migration
             $es_afiliado = false;
             $descuento_porcentaje = 0;
             $nivel_membresia = null;
             
             if ($empresa_id) {
-                // Check if membresias has descuento_salones column
+                // Try with descuento_salones column (enhanced schema)
                 try {
                     $stmt = $db->prepare("
                         SELECT e.membresia_id, m.nombre as nombre_membresia, m.descuento_salones
@@ -59,7 +60,8 @@ try {
                         $nivel_membresia = $empresa['nombre_membresia'];
                     }
                 } catch (PDOException $e) {
-                    // descuento_salones column doesn't exist, try without it
+                    // descuento_salones column doesn't exist - migration not applied
+                    // Fallback to basic query without discount column
                     $stmt = $db->prepare("
                         SELECT e.membresia_id, m.nombre as nombre_membresia
                         FROM empresas e
@@ -77,7 +79,8 @@ try {
             }
             
             // Seleccionar el precio según tipo de tarifa y afiliación
-            // First try enhanced pricing columns, fallback to basic pricing
+            // Enhanced pricing columns (precio_X_afiliado/no_afiliado) are added by migration
+            // Fallback to base price (precio_X) if enhanced columns don't exist
             $monto_total = 0;
             $campo_precio_afiliado = "precio_{$tipo_tarifa}_afiliado";
             $campo_precio_no_afiliado = "precio_{$tipo_tarifa}_no_afiliado";
@@ -88,7 +91,7 @@ try {
             } elseif (!$es_afiliado && isset($salon[$campo_precio_no_afiliado]) && floatval($salon[$campo_precio_no_afiliado]) > 0) {
                 $monto_total = floatval($salon[$campo_precio_no_afiliado]);
             } elseif (isset($salon[$campo_precio_base])) {
-                // Fallback to base price
+                // Fallback to base price when enhanced pricing columns don't exist or are zero
                 $monto_total = floatval($salon[$campo_precio_base]);
             }
             
@@ -164,7 +167,7 @@ try {
             $nivel_membresia = null;
             
             if ($empresa_id) {
-                // Check if membresias has descuento_salones column
+                // Try with descuento_salones column (enhanced schema from 20251124_salon_enhancements.sql)
                 try {
                     $stmt = $db->prepare("
                         SELECT e.membresia_id, m.nombre as nombre_membresia, m.descuento_salones
@@ -181,7 +184,8 @@ try {
                         $nivel_membresia = $empresa['nombre_membresia'];
                     }
                 } catch (PDOException $e) {
-                    // descuento_salones column doesn't exist, try without it
+                    // descuento_salones column doesn't exist - migration not applied
+                    // Fallback to basic query without discount column
                     $stmt = $db->prepare("
                         SELECT e.membresia_id, m.nombre as nombre_membresia
                         FROM empresas e
@@ -198,7 +202,8 @@ try {
                 }
             }
             
-            // Calculate price with fallback for missing columns
+            // Calculate price with fallback for missing columns from migration
+            // Enhanced columns (precio_X_afiliado/no_afiliado) added by 20251124_salon_enhancements.sql
             $campo_precio_afiliado = "precio_{$tipo_tarifa}_afiliado";
             $campo_precio_no_afiliado = "precio_{$tipo_tarifa}_no_afiliado";
             $campo_precio_base = "precio_{$tipo_tarifa}";
@@ -209,6 +214,7 @@ try {
             } elseif (!$es_afiliado && isset($salon[$campo_precio_no_afiliado]) && floatval($salon[$campo_precio_no_afiliado]) > 0) {
                 $monto_total = floatval($salon[$campo_precio_no_afiliado]);
             } elseif (isset($salon[$campo_precio_base])) {
+                // Fallback to base price when enhanced pricing columns don't exist or are zero
                 $monto_total = floatval($salon[$campo_precio_base]);
             }
             
@@ -216,6 +222,7 @@ try {
             $monto_final = $monto_total - $monto_descuento;
             
             // Crear reserva - try with enhanced columns first, fallback to basic columns
+            // Enhanced columns (monto_total, monto_final, etc.) added by 20251124_salon_enhancements.sql
             try {
                 $sql = "INSERT INTO salon_reservas (
                     salon_id, empresa_id, usuario_id, fecha_inicio, fecha_fin,
@@ -232,7 +239,8 @@ try {
                     $es_afiliado ? 1 : 0, $nivel_membresia
                 ]);
             } catch (PDOException $e) {
-                // Enhanced columns don't exist, use basic insert
+                // Enhanced columns don't exist - migration not applied
+                // Use basic insert with columns from original 20251124_add_salones_module.sql
                 $sql = "INSERT INTO salon_reservas (
                     salon_id, empresa_id, usuario_id, fecha_inicio, fecha_fin,
                     proposito, contacto_nombre, contacto_email, contacto_telefono, notas, estado

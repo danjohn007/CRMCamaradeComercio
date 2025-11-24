@@ -203,13 +203,15 @@ if (in_array($action, ['new', 'edit'])) {
             $action = 'list';
         } else {
             // Obtener imágenes del salón (if table exists)
+            // The salon_imagenes table is created by 20251124_salon_enhancements.sql migration
+            // Gracefully handle case where migration hasn't been applied yet
             $salon_imagenes = [];
             try {
                 $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
                 $stmt->execute([$id]);
                 $salon_imagenes = $stmt->fetchAll();
             } catch (PDOException $e) {
-                // Table doesn't exist yet - ignore and continue with empty array
+                // salon_imagenes table doesn't exist - migration not applied, continue with empty array
             }
         }
     }
@@ -233,13 +235,15 @@ if ($action === 'view' && $id) {
         $action = 'list';
     } else {
         // Obtener imágenes del salón (if table exists)
+        // The salon_imagenes table is created by 20251124_salon_enhancements.sql migration
+        // Gracefully handle case where migration hasn't been applied yet
         $salon_imagenes = [];
         try {
             $stmt = $db->prepare("SELECT * FROM salon_imagenes WHERE salon_id = ? ORDER BY orden ASC");
             $stmt->execute([$id]);
             $salon_imagenes = $stmt->fetchAll();
         } catch (PDOException $e) {
-            // Table doesn't exist yet - ignore and continue with empty array
+            // salon_imagenes table doesn't exist - migration not applied, continue with empty array
         }
         
         // Obtener reservas del salón
