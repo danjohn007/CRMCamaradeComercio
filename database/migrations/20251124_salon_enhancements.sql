@@ -66,3 +66,6 @@ UPDATE membresias SET descuento_salones =
         ELSE 0.00                        -- No discount for others
     END
 WHERE descuento_salones = 0;
+
+-- Add compound index for better reservation conflict checking performance
+CREATE INDEX IF NOT EXISTS idx_salon_fecha_estado ON salon_reservas(salon_id, fecha_inicio, fecha_fin, estado);

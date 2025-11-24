@@ -709,7 +709,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                 const formData = new FormData();
                 formData.append('imagen_id', imagenId);
                 
-                const response = await fetch('<?php echo BASE_URL; ?>/api/salon_imagenes.php?action=set_principal', {
+                const response = await fetch('<?php echo htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8'); ?>/api/salon_imagenes.php?action=set_principal', {
                     method: 'POST',
                     body: formData
                 });
@@ -735,7 +735,7 @@ include __DIR__ . '/app/views/layouts/header.php';
                 const formData = new FormData();
                 formData.append('imagen_id', imagenId);
                 
-                const response = await fetch('<?php echo BASE_URL; ?>/api/salon_imagenes.php?action=delete', {
+                const response = await fetch('<?php echo htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8'); ?>/api/salon_imagenes.php?action=delete', {
                     method: 'POST',
                     body: formData
                 });
@@ -1186,7 +1186,7 @@ async function calcularPrecio() {
 
     try {
         const formData = new FormData();
-        formData.append('salon_id', <?php echo $salon['id']; ?>);
+        formData.append('salon_id', <?php echo (int)$salon['id']; ?>);
         formData.append('tipo_tarifa', tipoTarifa);
 
         const response = await fetch('<?php echo BASE_URL; ?>/api/salon_reservas.php?action=calcular_precio', {
@@ -1223,7 +1223,7 @@ document.getElementById('form-reserva').addEventListener('submit', async functio
 
         if (data.success) {
             alert('Reserva creada exitosamente. Monto total: $' + data.monto_final.toFixed(2) + '\n\nProceda con el pago para confirmar su reserva.');
-            window.location.href = '?action=pago&reserva_id=' + data.reserva_id + '&id=<?php echo $salon['id']; ?>';
+            window.location.href = '?action=pago&reserva_id=' + data.reserva_id + '&id=<?php echo (int)$salon['id']; ?>';
         } else {
             alert('Error: ' + data.message);
         }
@@ -1575,7 +1575,7 @@ paypal.Buttons({
             .then(data => {
                 if (data.success) {
                     alert('¡Pago exitoso! Recibirá un comprobante por correo electrónico.');
-                    window.location.href = '?action=confirmacion&reserva_id=<?php echo $reserva['id']; ?>&id=<?php echo $reserva['salon_id']; ?>';
+                    window.location.href = '?action=confirmacion&reserva_id=<?php echo (int)$reserva['id']; ?>&id=<?php echo (int)$reserva['salon_id']; ?>';
                 } else {
                     alert('Error al procesar el pago: ' + data.message);
                 }
@@ -1603,7 +1603,7 @@ document.getElementById('form-comprobante').addEventListener('submit', async fun
         
         if (data.success) {
             alert('Comprobante subido exitosamente. Su reserva será revisada.');
-            window.location.href = '?action=confirmacion&reserva_id=<?php echo $reserva['id']; ?>&id=<?php echo $reserva['salon_id']; ?>';
+            window.location.href = '?action=confirmacion&reserva_id=<?php echo (int)$reserva['id']; ?>&id=<?php echo (int)$reserva['salon_id']; ?>';
         } else {
             alert('Error: ' + data.message);
         }
