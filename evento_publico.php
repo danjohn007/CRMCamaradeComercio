@@ -172,10 +172,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         // Verificar si ya está registrado con ese email
-        $stmt = $db->prepare("SELECT id FROM eventos_inscripciones WHERE evento_id = ? AND email_invitado = ?");
+        $stmt = $db->prepare("SELECT id, boletos_solicitados FROM eventos_inscripciones WHERE evento_id = ? AND email_invitado = ?");
         $stmt->execute([$evento_id, $email]);
-        if ($stmt->fetch()) {
-            throw new Exception('Este email ya está registrado para este evento');
+        $registro_existente = $stmt->fetch();
+        
+        // Si hay registro existente Y se está intentando registrar (no es una compra adicional), 
+        // lanzar excepción con información especial
+        if ($registro_existente && !isset($_POST['compra_adicional'])) {
+            throw new Exception('EMAIL_EXISTENTE|' . $registro_existente['id'] . '|' . $registro_existente['boletos_solicitados']);
+        }
+        
+        // Si es una compra adicional, actualizar el registro existente
+        if ($registro_existente && isset($_POST['compra_adicional'])) {
+            $inscripcion_id = $registro_existente['id'];
+            
+            // Actualizar boletos solicitados y monto
+            $nuevos_boletos_totales = $registro_existente['boletos_solicitados'] + $boletos;
+            $nuevo_monto_total = $monto_total; // Solo cobrar por los boletos adicionales
+            
+            $stmt = $db->prepare("
+                UPDATE eventos_inscripciones 
+                SET boletos_solicitados = ?, 
+                    monto_pagado = monto_pagado + ?,
+                    estado_pago = CASE 
+                        WHEN ? > 0 THEN 'PENDIENTE' 
+                        ELSE estado_pago 
+                    END
+                WHERE id = ?
+            ");
+            $stmt->execute([$nuevos_boletos_totales, $nuevo_monto_total, $nuevo_monto_total, $inscripcion_id]);
+            
+            // Actualizar contador de inscritos en el evento
+            $stmt = $db->prepare("UPDATE eventos SET inscritos = inscritos + ? WHERE id = ?");
+            $stmt->execute([$boletos, $evento_id]);
+            
+            // Obtener datos completos de la inscripción actualizada
+            $stmt = $db->prepare("SELECT * FROM eventos_inscripciones WHERE id = ?");
+            $stmt->execute([$inscripcion_id]);
+            $inscripcion = $stmt->fetch();
+            
+            // Enviar email de confirmación de boletos adicionales
+            try {
+                if ($requiere_pago) {
+                    EmailHelper::sendEventRegistrationConfirmation($inscripcion, $evento, true, $nuevo_monto_total);
+                } else {
+                    // Si los boletos adicionales son gratuitos, generar QR y enviar
+                    $codigo_qr = $inscripcion['codigo_qr'];
+                    $qrCodePath = QRCodeGenerator::saveQRImage(
+                        BASE_URL . '/boleto_digital.php?codigo=' . $codigo_qr,
+                        $codigo_qr
+                    );
+                    EmailHelper::sendEventRegistrationConfirmation($inscripcion, $evento, false, 0, $qrCodePath);
+                    
+                    $stmt = $db->prepare("UPDATE eventos_inscripciones SET boleto_enviado = 1, fecha_envio_boleto = NOW() WHERE id = ?");
+                    $stmt->execute([$inscripcion_id]);
+                }
+            } catch (Exception $e) {
+                error_log("Error sending additional tickets confirmation email: " . $e->getMessage());
+            }
+            
+            // Regenerar captcha
+            $_SESSION['captcha_evento_num1'] = rand(1, 10);
+            $_SESSION['captcha_evento_num2'] = rand(1, 10);
+            
+            // Redirigir a página de boleto
+            $success_message = $requiere_pago 
+                ? "¡Boletos adicionales agregados! Total de boletos: {$nuevos_boletos_totales}. Por favor realice el pago de \$" . number_format($nuevo_monto_total, 2) . " MXN para los {$boletos} boletos adicionales."
+                : "¡Boletos adicionales agregados exitosamente! Total de boletos: {$nuevos_boletos_totales}.";
+            
+            header('Location: ' . BASE_URL . '/boleto_digital.php?codigo=' . urlencode($inscripcion['codigo_qr']) . '&mensaje=' . urlencode($success_message));
+            exit;
         }
         
         // Generar código QR único
@@ -335,7 +401,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $search_performed = false;
         
     } catch (Exception $e) {
-        $error = 'Error al registrar: ' . $e->getMessage();
+        $errorMessage = $e->getMessage();
+        
+        // Verificar si es un error de email existente
+        if (strpos($errorMessage, 'EMAIL_EXISTENTE|') === 0) {
+            // Extraer los datos del mensaje de error
+            $parts = explode('|', $errorMessage);
+            $inscripcion_id = $parts[1] ?? '';
+            $boletos_existentes = $parts[2] ?? 0;
+            
+            // Mostrar mensaje especial para email duplicado
+            $error = 'email_duplicado';
+            $_SESSION['email_duplicado_data'] = [
+                'email' => $email,
+                'inscripcion_id' => $inscripcion_id,
+                'boletos_existentes' => $boletos_existentes,
+                'nombre' => $nombre,
+                'boletos_solicitados' => $boletos
+            ];
+        } else {
+            $error = 'Error al registrar: ' . $errorMessage;
+        }
+        
         // Regenerar captcha en caso de error
         $_SESSION['captcha_evento_num1'] = rand(1, 10);
         $_SESSION['captcha_evento_num2'] = rand(1, 10);
@@ -586,12 +673,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <?php endif; ?>
 
             <?php if ($error): ?>
-                <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-exclamation-circle text-red-500 text-2xl mr-3"></i>
-                        <p class="text-red-700"><?php echo e($error); ?></p>
+                <?php if ($error === 'email_duplicado' && isset($_SESSION['email_duplicado_data'])): ?>
+                    <?php $dup_data = $_SESSION['email_duplicado_data']; ?>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mr-3 mt-1"></i>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-bold text-yellow-800 mb-2">
+                                    Este correo ya está registrado
+                                </h3>
+                                <p class="text-yellow-700 mb-4">
+                                    El correo <strong><?php echo e($dup_data['email']); ?></strong> ya tiene 
+                                    <strong><?php echo $dup_data['boletos_existentes']; ?> boleto(s)</strong> registrado(s) para este evento.
+                                </p>
+                                <p class="text-yellow-700 mb-4">
+                                    ¿Desea comprar <strong><?php echo $dup_data['boletos_solicitados']; ?> boleto(s) adicional(es)</strong> usando el mismo correo?
+                                </p>
+                                
+                                <!-- Formulario para compra adicional -->
+                                <form method="POST" id="formCompraAdicional" class="flex gap-3">
+                                    <input type="hidden" name="action" value="registrar">
+                                    <input type="hidden" name="compra_adicional" value="1">
+                                    <input type="hidden" name="nombre" value="<?php echo e($dup_data['nombre']); ?>">
+                                    <input type="hidden" name="email" value="<?php echo e($dup_data['email']); ?>">
+                                    <input type="hidden" name="boletos_solicitados" value="<?php echo $dup_data['boletos_solicitados']; ?>">
+                                    <input type="hidden" name="whatsapp_registro" value="<?php echo e($_POST['whatsapp_registro'] ?? ''); ?>">
+                                    <input type="hidden" name="rfc_registro" value="<?php echo e($_POST['rfc_registro'] ?? ''); ?>">
+                                    <input type="hidden" name="razon_social" value="<?php echo e($_POST['razon_social'] ?? ''); ?>">
+                                    <input type="hidden" name="empresa_id" value="<?php echo e($_POST['empresa_id'] ?? ''); ?>">
+                                    <input type="hidden" name="es_invitado" value="<?php echo isset($_POST['es_invitado']) ? '1' : '0'; ?>">
+                                    <input type="hidden" name="captcha_respuesta" value="<?php echo $_SESSION['captcha_evento_num1'] + $_SESSION['captcha_evento_num2']; ?>">
+                                    <input type="hidden" name="terminos" value="1">
+                                    
+                                    <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                                        <i class="fas fa-plus mr-2"></i>Sí, comprar más boletos
+                                    </button>
+                                    <button type="button" onclick="location.reload()" class="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-semibold">
+                                        <i class="fas fa-times mr-2"></i>Cancelar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                    <?php unset($_SESSION['email_duplicado_data']); ?>
+                <?php else: ?>
+                    <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-circle text-red-500 text-2xl mr-3"></i>
+                            <p class="text-red-700"><?php echo e($error); ?></p>
+                        </div>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
 
             <!-- Formulario de búsqueda -->
