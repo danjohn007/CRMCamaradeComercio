@@ -51,6 +51,47 @@ if (empty($codigo)) {
         if ($data['costo'] > 0 && $data['estado_pago'] === 'PENDIENTE') {
             $error = 'Este boleto requiere pago. Por favor complete el pago para poder imprimirlo.';
             $inscripcion = $data; // Guardar para mostrar info de pago
+            
+            // Calcular monto a pagar si no está definido o es 0
+            if (empty($inscripcion['monto_pagado']) || floatval($inscripcion['monto_pagado']) <= 0) {
+                $boletos = intval($inscripcion['boletos_solicitados'] ?? 1);
+                $costo_evento = floatval($inscripcion['costo'] ?? 0);
+                
+                // Verificar si hay precio de preventa aplicable
+                $precio_efectivo = $costo_evento;
+                $ahora = new DateTime();
+                
+                if (!empty($inscripcion['precio_preventa']) && $inscripcion['precio_preventa'] > 0 && 
+                    !empty($inscripcion['fecha_limite_preventa'])) {
+                    $fecha_limite = new DateTime($inscripcion['fecha_limite_preventa']);
+                    if ($ahora <= $fecha_limite) {
+                        $precio_efectivo = floatval($inscripcion['precio_preventa']);
+                    }
+                }
+                
+                // Calcular boletos a pagar (considerando boleto gratis para afiliados)
+                $boletos_a_pagar = $boletos;
+                $permite_acceso_gratis = isset($inscripcion['acceso_gratis_afiliados']) ? (bool)$inscripcion['acceso_gratis_afiliados'] : false;
+                
+                if ($permite_acceso_gratis && !empty($inscripcion['empresa_id'])) {
+                    // Verificar membresía vigente de la empresa
+                    $stmt_empresa = $db->prepare("
+                        SELECT fecha_renovacion FROM empresas WHERE id = ? AND activo = 1
+                    ");
+                    $stmt_empresa->execute([$inscripcion['empresa_id']]);
+                    $empresa = $stmt_empresa->fetch();
+                    
+                    if ($empresa && !empty($empresa['fecha_renovacion'])) {
+                        $fecha_renovacion = new DateTime($empresa['fecha_renovacion']);
+                        if ($ahora <= $fecha_renovacion) {
+                            // Empresa con membresía vigente: primer boleto gratis
+                            $boletos_a_pagar = max(0, $boletos - 1);
+                        }
+                    }
+                }
+                
+                $inscripcion['monto_pagado'] = $precio_efectivo * $boletos_a_pagar;
+            }
         } elseif ($data['costo'] > 0 && $data['estado_pago'] === 'CANCELADO') {
             $error = 'El pago de este boleto fue cancelado. Por favor contacte al administrador.';
         } else {

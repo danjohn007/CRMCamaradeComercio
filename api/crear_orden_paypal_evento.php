@@ -22,7 +22,7 @@ try {
     
     // Obtener datos de la inscripción
     $stmt = $db->prepare("
-        SELECT ei.*, e.titulo, e.costo, e.descripcion
+        SELECT ei.*, e.titulo, e.costo, e.descripcion, e.precio_preventa, e.fecha_limite_preventa, e.acceso_gratis_afiliados
         FROM eventos_inscripciones ei
         JOIN eventos e ON ei.evento_id = e.id
         WHERE ei.id = ?
@@ -36,6 +36,47 @@ try {
     
     // Usar el monto que ya fue calculado en evento_publico.php (incluye preventa y boleto gratis)
     $monto_total = floatval($inscripcion['monto_pagado'] ?? 0);
+    
+    // Si monto_pagado es 0, calcular basado en costo del evento y boletos
+    if ($monto_total <= 0) {
+        $boletos = intval($inscripcion['boletos_solicitados'] ?? 1);
+        $costo_evento = floatval($inscripcion['costo'] ?? 0);
+        
+        // Verificar si hay precio de preventa aplicable
+        $precio_efectivo = $costo_evento;
+        $ahora = new DateTime();
+        
+        if (!empty($inscripcion['precio_preventa']) && $inscripcion['precio_preventa'] > 0 && 
+            !empty($inscripcion['fecha_limite_preventa'])) {
+            $fecha_limite = new DateTime($inscripcion['fecha_limite_preventa']);
+            if ($ahora <= $fecha_limite) {
+                $precio_efectivo = floatval($inscripcion['precio_preventa']);
+            }
+        }
+        
+        // Calcular boletos a pagar (considerando boleto gratis para afiliados)
+        $boletos_a_pagar = $boletos;
+        $permite_acceso_gratis = isset($inscripcion['acceso_gratis_afiliados']) ? (bool)$inscripcion['acceso_gratis_afiliados'] : false;
+        
+        if ($permite_acceso_gratis && !empty($inscripcion['empresa_id'])) {
+            // Verificar membresía vigente de la empresa
+            $stmt_empresa = $db->prepare("
+                SELECT fecha_renovacion FROM empresas WHERE id = ? AND activo = 1
+            ");
+            $stmt_empresa->execute([$inscripcion['empresa_id']]);
+            $empresa = $stmt_empresa->fetch();
+            
+            if ($empresa && !empty($empresa['fecha_renovacion'])) {
+                $fecha_renovacion = new DateTime($empresa['fecha_renovacion']);
+                if ($ahora <= $fecha_renovacion) {
+                    // Empresa con membresía vigente: primer boleto gratis
+                    $boletos_a_pagar = max(0, $boletos - 1);
+                }
+            }
+        }
+        
+        $monto_total = $precio_efectivo * $boletos_a_pagar;
+    }
     
     // Verificar que haya monto a pagar
     if ($monto_total <= 0) {
