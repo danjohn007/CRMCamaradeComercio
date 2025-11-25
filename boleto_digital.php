@@ -193,8 +193,6 @@ if (empty($codigo)) {
                 <script>
                 paypal.Buttons({
                     createOrder: function(data, actions) {
-                        document.getElementById('paypal-button-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i><p class="text-sm text-gray-600 mt-2">Procesando...</p></div>';
-                        
                         return fetch('<?php echo BASE_URL; ?>/api/crear_orden_paypal_evento.php', {
                             method: 'POST',
                             headers: {
