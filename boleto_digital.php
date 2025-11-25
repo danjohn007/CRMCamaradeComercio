@@ -71,7 +71,7 @@ if (empty($codigo)) {
                 
                 // Calcular boletos a pagar (considerando boleto gratis para afiliados)
                 $boletos_a_pagar = $boletos;
-                $permite_acceso_gratis = isset($inscripcion['acceso_gratis_afiliados']) ? (bool)$inscripcion['acceso_gratis_afiliados'] : true;
+                $permite_acceso_gratis = isset($inscripcion['acceso_gratis_afiliados']) ? (bool)$inscripcion['acceso_gratis_afiliados'] : false;
                 
                 if ($permite_acceso_gratis && !empty($inscripcion['empresa_id'])) {
                     // Verificar membresía vigente de la empresa
